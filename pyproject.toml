@@ -1,7 +1,7 @@
 [project]
 name = "pricewatch"
 version = "0.1.0"
-description = "Track product prices with a local LLM and Good Search"
+description = "Track product prices with Ollama and local Good-search MCP"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
@@ -16,6 +16,9 @@ dependencies = [
 
 [project.scripts]
 pricewatch = "pricewatch.main:run"
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0.0"]
 
 [build-system]
 requires = ["setuptools>=75.0.0"]

@@ -33,7 +33,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="Pricewatch",
-    description="Track product prices with Ollama and Good Search",
+    description="Track product prices with Ollama and local Good-search MCP",
     version="0.1.0",
     lifespan=lifespan,
 )
@@ -59,13 +59,23 @@ async def dashboard(request: Request) -> HTMLResponse:
 
 @app.get("/health")
 async def health() -> dict:
+    from pricewatch.services.good_search import GoodSearchClient, GoodSearchError
+
     settings = get_settings()
-    return {
+    payload = {
         "status": "ok",
         "ollama": settings.ollama_base_url,
         "model": settings.ollama_model,
+        "good_search_mcp_url": settings.good_search_mcp_url,
         "check_interval_minutes": settings.check_interval_minutes,
     }
+
+    try:
+        payload["good_search"] = await GoodSearchClient(settings).health_check()
+    except GoodSearchError as exc:
+        payload["good_search"] = {"reachable": False, "error": str(exc)}
+
+    return payload
 
 
 def run() -> None:

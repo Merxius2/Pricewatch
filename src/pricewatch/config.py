@@ -17,8 +17,10 @@ class Settings(BaseSettings):
     ollama_base_url: str = "http://localhost:11434"
     ollama_model: str = "llama3.2"
 
-    good_search_base_url: str = "https://damngoodsearch.com/api/v1"
-    good_search_api_key: str = ""
+    good_search_mcp_url: str = "http://127.0.0.1:8765/mcp"
+    good_search_search_tool: str = ""
+    good_search_fetch_tool: str = ""
+    good_search_timeout_seconds: float = 120.0
 
     check_interval_minutes: int = 60
 

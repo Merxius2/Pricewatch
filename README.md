@@ -1,6 +1,6 @@
 # Pricewatch
 
-Pricewatch is a self-hosted price tracking tool designed to run on a Linux mini-PC with a local LLM via [Ollama](https://ollama.com). It provides a web dashboard to add, edit, and remove tracked products, then periodically checks prices using [Damn Good Search](https://damngoodsearch.com) and your local model to extract the current price.
+Pricewatch is a self-hosted price tracking tool designed to run on a Linux mini-PC with a local LLM via [Ollama](https://ollama.com). It provides a web dashboard to add, edit, and remove tracked products, then periodically checks prices using your local **[Good-search](https://github.com/katjabunich/Good-search)** MCP service and Ollama to extract the current price.
 
 ## Features
 
@@ -14,7 +14,7 @@ Pricewatch is a self-hosted price tracking tool designed to run on a Linux mini-
 - **Manual checks** — run a check for one product or all enabled products
 - **Price history** — store and review past checks per product
 - **Ollama integration** — local LLM extracts structured price data from search results
-- **Good Search integration** — web search + page contents for accurate price discovery
+- **Good-search integration** — local stealth-browser search + page parsing via MCP
 
 ## Architecture
 
@@ -27,7 +27,7 @@ FastAPI + SQLite
       ├── Scheduler (APScheduler)
       │
       └── Price checker
-            ├── Good Search API (search + contents)
+            ├── Good-search MCP (local search + page parsing)
             └── Ollama (local LLM price extraction)
 ```
 
@@ -37,7 +37,7 @@ FastAPI + SQLite
 
 - Python 3.11+
 - [Ollama](https://ollama.com) running locally
-- A Damn Good Search API key from [damngoodsearch.com](https://damngoodsearch.com)
+- [Good-search](https://github.com/katjabunich/Good-search) installed and running locally
 
 Pull a model:
 
@@ -45,7 +45,19 @@ Pull a model:
 ollama pull llama3.2
 ```
 
-### 2. Install
+Install Good-search:
+
+```bash
+cd ~
+git clone git@github.com:katjabunich/Good-search.git Good-search-git
+cd Good-search-git
+git checkout claude/stealth-browser-parsing-alternatives-28lrsa
+bash mcp/install.sh --yes --no-tunnel
+```
+
+See [docs/good-search-setup.md](docs/good-search-setup.md) for details.
+
+### 2. Install Pricewatch
 
 ```bash
 python -m venv .venv
@@ -57,9 +69,11 @@ cp .env.example .env
 Edit `.env` and set at least:
 
 ```env
-PRICEWATCH_GOOD_SEARCH_API_KEY=dgs_live_...
+PRICEWATCH_GOOD_SEARCH_MCP_URL=http://127.0.0.1:8765/mcp
 PRICEWATCH_OLLAMA_MODEL=llama3.2
 ```
+
+Adjust the MCP URL if your Good-search install prints a different address.
 
 ### 3. Run
 
@@ -68,6 +82,12 @@ pricewatch
 ```
 
 Open `http://localhost:8080` for the dashboard.
+
+Verify dependencies:
+
+```bash
+curl http://localhost:8080/health
+```
 
 ## Configuration
 
@@ -78,8 +98,10 @@ Open `http://localhost:8080` for the dashboard.
 | `PRICEWATCH_DATABASE_URL` | `sqlite:///./data/pricewatch.db` | SQLite database path |
 | `PRICEWATCH_OLLAMA_BASE_URL` | `http://localhost:11434` | Ollama API URL |
 | `PRICEWATCH_OLLAMA_MODEL` | `llama3.2` | Model used for price extraction |
-| `PRICEWATCH_GOOD_SEARCH_BASE_URL` | `https://damngoodsearch.com/api/v1` | Good Search API base URL |
-| `PRICEWATCH_GOOD_SEARCH_API_KEY` | _(empty)_ | Good Search bearer token |
+| `PRICEWATCH_GOOD_SEARCH_MCP_URL` | `http://127.0.0.1:8765/mcp` | Good-search MCP endpoint |
+| `PRICEWATCH_GOOD_SEARCH_SEARCH_TOOL` | _(auto)_ | Override search tool name |
+| `PRICEWATCH_GOOD_SEARCH_FETCH_TOOL` | _(auto)_ | Override fetch/parse tool name |
+| `PRICEWATCH_GOOD_SEARCH_TIMEOUT_SECONDS` | `120` | MCP request timeout |
 | `PRICEWATCH_CHECK_INTERVAL_MINUTES` | `60` | Default scheduler interval |
 
 ## API
@@ -107,7 +129,7 @@ sudo systemctl daemon-reload
 sudo systemctl enable --now pricewatch
 ```
 
-Ensure Ollama is running before Pricewatch starts.
+Ensure **Ollama** and **Good-search** are running before Pricewatch starts.
 
 ## Roadmap ideas
 
@@ -116,7 +138,6 @@ Ensure Ollama is running before Pricewatch starts.
 - Import/export tracked items as JSON or CSV
 - Multi-retailer comparison for the same product
 - Auth for the dashboard when exposed beyond localhost
-- Support alternate search providers behind the same interface
 
 ## Development
 
