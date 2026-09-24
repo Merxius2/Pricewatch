@@ -1,15 +1,18 @@
 [Unit]
 Description=Pricewatch price tracking dashboard
-After=network.target ollama.service
+After=network-online.target
+Wants=network-online.target
 
 [Service]
 Type=simple
 User=pricewatch
 WorkingDirectory=/opt/pricewatch
-EnvironmentFile=/opt/pricewatch/.env
+EnvironmentFile=-/opt/pricewatch/.env
 ExecStart=/opt/pricewatch/.venv/bin/pricewatch
 Restart=on-failure
 RestartSec=10
+
+# Good-search MCP and Ollama are managed separately on the mini-PC.
 
 [Install]
 WantedBy=multi-user.target
