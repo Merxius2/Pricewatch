@@ -21,9 +21,32 @@ BASE_DIR = Path(__file__).resolve().parent
 scheduler = PriceWatchScheduler()
 
 
+async def _connect_good_search() -> None:
+    from pricewatch.services.good_search import GoodSearchClient, GoodSearchError
+
+    settings = get_settings()
+    client = GoodSearchClient(settings)
+    try:
+        health = await client.ensure_connected()
+        logger.info(
+            "Good-search MCP ready at %s (search=%s, fetch=%s, tools=%s)",
+            health["mcp_url"],
+            health["search_tool"],
+            health["fetch_tool"],
+            ", ".join(health["tools"]),
+        )
+    except Exception as exc:  # noqa: BLE001
+        logger.warning(
+            "Good-search MCP not reachable yet (%s). "
+            "Price checks will retry when the scheduler runs.",
+            exc,
+        )
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     init_db()
+    await _connect_good_search()
     scheduler.start()
     logger.info("Pricewatch started")
     yield
@@ -70,10 +93,14 @@ async def health() -> dict:
         "check_interval_minutes": settings.check_interval_minutes,
     }
 
-    try:
-        payload["good_search"] = await GoodSearchClient(settings).health_check()
-    except GoodSearchError as exc:
-        payload["good_search"] = {"reachable": False, "error": str(exc)}
+    cached = GoodSearchClient.cached_health()
+    if cached:
+        payload["good_search"] = cached
+    else:
+        try:
+            payload["good_search"] = await GoodSearchClient(settings).ensure_connected()
+        except GoodSearchError as exc:
+            payload["good_search"] = {"reachable": False, "error": str(exc)}
 
     return payload
 

@@ -15,13 +15,42 @@ class GoodSearchError(Exception):
 
 SEARCH_TOOL_HINTS = ("search", "google_search", "web_search", "query")
 FETCH_TOOL_HINTS = ("fetch", "read", "contents", "get_page", "webfetch", "web_fetch", "parse")
+DEFAULT_MCP_CANDIDATES = (
+    "http://127.0.0.1:8765/mcp",
+    "http://127.0.0.1:8420/mcp",
+    "http://127.0.0.1:3000/mcp",
+    "http://127.0.0.1:8081/mcp",
+    "http://127.0.0.1:9000/mcp",
+)
+
+_resolved_mcp_url: str | None = None
+_resolved_health: dict[str, Any] | None = None
+
+
+def mcp_url_candidates(settings: Settings) -> list[str]:
+    if settings.good_search_mcp_url_candidates.strip():
+        return [
+            url.strip().rstrip("/")
+            for url in settings.good_search_mcp_url_candidates.split(",")
+            if url.strip()
+        ]
+
+    ordered = [settings.good_search_mcp_url.rstrip("/"), *DEFAULT_MCP_CANDIDATES]
+    seen: set[str] = set()
+    unique: list[str] = []
+    for url in ordered:
+        if url not in seen:
+            seen.add(url)
+            unique.append(url)
+    return unique
 
 
 class GoodSearchClient:
     """Client for the local Good-search MCP service (stealth browser search + parsing)."""
 
     def __init__(self, settings: Settings) -> None:
-        self.mcp_url = settings.good_search_mcp_url.rstrip("/")
+        self.settings = settings
+        self.mcp_url = (_resolved_mcp_url or settings.good_search_mcp_url).rstrip("/")
         self.search_tool = settings.good_search_search_tool
         self.fetch_tool = settings.good_search_fetch_tool
         self.timeout = settings.good_search_timeout_seconds
@@ -29,7 +58,56 @@ class GoodSearchClient:
         self._request_id = 0
         self._discovered_tools: dict[str, str] | None = None
 
+    @classmethod
+    def cached_health(cls) -> dict[str, Any] | None:
+        return _resolved_health
+
+    async def ensure_connected(self) -> dict[str, Any]:
+        global _resolved_mcp_url, _resolved_health
+
+        if _resolved_health is not None:
+            return _resolved_health
+
+        try:
+            health = await self.health_check()
+        except GoodSearchError as first_error:
+            if not self.settings.good_search_auto_discover:
+                raise GoodSearchError(
+                    f"Good-search MCP is not reachable at {self.mcp_url}: {first_error}"
+                ) from first_error
+
+            last_error = first_error
+            for candidate in mcp_url_candidates(self.settings):
+                if candidate == self.mcp_url:
+                    continue
+                probe = GoodSearchClient(self.settings)
+                probe.mcp_url = candidate
+                try:
+                    health = await probe.health_check()
+                    self.mcp_url = candidate
+                    _resolved_mcp_url = candidate
+                    _resolved_health = health
+                    return health
+                except GoodSearchError as exc:
+                    last_error = exc
+
+            raise GoodSearchError(
+                "Good-search MCP is not reachable on this host. "
+                f"Tried: {', '.join(mcp_url_candidates(self.settings))}. "
+                f"Last error: {last_error}"
+            ) from last_error
+
+        _resolved_mcp_url = self.mcp_url
+        _resolved_health = health
+        return health
+
+    def _reset_session(self) -> None:
+        self._session_id = None
+        self._request_id = 0
+        self._discovered_tools = None
+
     async def search(self, query: str, limit: int = 5) -> list[dict[str, Any]]:
+        await self.ensure_connected()
         tool_name = await self._resolve_tool("search", self.search_tool, SEARCH_TOOL_HINTS)
         result = await self._call_tool(
             tool_name,
@@ -42,6 +120,7 @@ class GoodSearchClient:
         return self._parse_search_results(result)
 
     async def fetch_contents(self, url: str) -> str:
+        await self.ensure_connected()
         tool_name = await self._resolve_tool("fetch", self.fetch_tool, FETCH_TOOL_HINTS)
         result = await self._call_tool(tool_name, {"url": url})
         return self._extract_text(result)
@@ -167,10 +246,14 @@ class GoodSearchClient:
         }
 
         async with httpx.AsyncClient(timeout=self.timeout) as client:
-            if method == "tools/list" and self._session_id is None:
-                await self._initialize(client, headers)
+            try:
+                if method == "tools/list" and self._session_id is None:
+                    await self._initialize(client, headers)
 
-            response = await client.post(self.mcp_url, headers=headers, json=body)
+                response = await client.post(self.mcp_url, headers=headers, json=body)
+            except httpx.HTTPError as exc:
+                raise GoodSearchError(f"Good-search MCP unreachable at {self.mcp_url}: {exc}") from exc
+
             if response.status_code >= 400:
                 raise GoodSearchError(
                     f"Good-search MCP request failed ({response.status_code}): {response.text}"
@@ -199,7 +282,11 @@ class GoodSearchClient:
                 "clientInfo": {"name": "pricewatch", "version": "0.1.0"},
             },
         }
-        response = await client.post(self.mcp_url, headers=headers, json=init_body)
+        try:
+            response = await client.post(self.mcp_url, headers=headers, json=init_body)
+        except httpx.HTTPError as exc:
+            raise GoodSearchError(f"Good-search MCP unreachable at {self.mcp_url}: {exc}") from exc
+
         if response.status_code >= 400:
             raise GoodSearchError(
                 f"Good-search MCP initialize failed ({response.status_code}): {response.text}"

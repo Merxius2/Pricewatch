@@ -18,6 +18,8 @@ class Settings(BaseSettings):
     ollama_model: str = "llama3.2"
 
     good_search_mcp_url: str = "http://127.0.0.1:8765/mcp"
+    good_search_auto_discover: bool = True
+    good_search_mcp_url_candidates: str = ""
     good_search_search_tool: str = ""
     good_search_fetch_tool: str = ""
     good_search_timeout_seconds: float = 120.0

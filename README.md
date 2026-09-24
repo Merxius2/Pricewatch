@@ -37,7 +37,7 @@ FastAPI + SQLite
 
 - Python 3.11+
 - [Ollama](https://ollama.com) running locally
-- [Good-search](https://github.com/katjabunich/Good-search) installed and running locally
+- **Good-search MCP already running** on the same host ([setup reference](docs/good-search-setup.md))
 
 Pull a model:
 
@@ -45,17 +45,7 @@ Pull a model:
 ollama pull llama3.2
 ```
 
-Install Good-search:
-
-```bash
-cd ~
-git clone git@github.com:katjabunich/Good-search.git Good-search-git
-cd Good-search-git
-git checkout claude/stealth-browser-parsing-alternatives-28lrsa
-bash mcp/install.sh --yes --no-tunnel
-```
-
-See [docs/good-search-setup.md](docs/good-search-setup.md) for details.
+Pricewatch auto-connects to the local Good-search MCP on startup.
 
 ### 2. Install Pricewatch
 
@@ -73,7 +63,7 @@ PRICEWATCH_GOOD_SEARCH_MCP_URL=http://127.0.0.1:8765/mcp
 PRICEWATCH_OLLAMA_MODEL=llama3.2
 ```
 
-Adjust the MCP URL if your Good-search install prints a different address.
+If auto-discovery cannot find Good-search, set `PRICEWATCH_GOOD_SEARCH_MCP_URL` to the URL printed by your MCP install.
 
 ### 3. Run
 
@@ -99,6 +89,8 @@ curl http://localhost:8080/health
 | `PRICEWATCH_OLLAMA_BASE_URL` | `http://localhost:11434` | Ollama API URL |
 | `PRICEWATCH_OLLAMA_MODEL` | `llama3.2` | Model used for price extraction |
 | `PRICEWATCH_GOOD_SEARCH_MCP_URL` | `http://127.0.0.1:8765/mcp` | Good-search MCP endpoint |
+| `PRICEWATCH_GOOD_SEARCH_AUTO_DISCOVER` | `true` | Probe localhost MCP URLs on startup |
+| `PRICEWATCH_GOOD_SEARCH_MCP_URL_CANDIDATES` | _(built-in list)_ | Comma-separated MCP URLs to probe |
 | `PRICEWATCH_GOOD_SEARCH_SEARCH_TOOL` | _(auto)_ | Override search tool name |
 | `PRICEWATCH_GOOD_SEARCH_FETCH_TOOL` | _(auto)_ | Override fetch/parse tool name |
 | `PRICEWATCH_GOOD_SEARCH_TIMEOUT_SECONDS` | `120` | MCP request timeout |
@@ -129,7 +121,7 @@ sudo systemctl daemon-reload
 sudo systemctl enable --now pricewatch
 ```
 
-Ensure **Ollama** and **Good-search** are running before Pricewatch starts.
+Ensure **Good-search MCP** and **Ollama** are already running on the target host before starting Pricewatch.
 
 ## Roadmap ideas
 

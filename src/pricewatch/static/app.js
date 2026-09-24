@@ -18,6 +18,9 @@ const els = {
   dialogTitle: document.getElementById("dialog-title"),
   percentDropField: document.getElementById("percent-drop-field"),
   toast: document.getElementById("toast"),
+  serviceStatus: document.getElementById("service-status"),
+  goodSearchStatus: document.getElementById("good-search-status"),
+  ollamaStatus: document.getElementById("ollama-status"),
 };
 
 function formatMoney(value, currency = "USD") {
@@ -54,13 +57,34 @@ async function api(path, options = {}) {
 }
 
 async function loadDashboard() {
-  const [stats, items] = await Promise.all([
+  const [stats, items, health] = await Promise.all([
     api("/api/stats"),
     api("/api/items"),
+    api("/health"),
   ]);
   state.items = items;
   renderStats(stats);
+  renderServiceStatus(health);
   renderItems();
+}
+
+function renderServiceStatus(health) {
+  els.serviceStatus.classList.remove("hidden");
+
+  const goodSearch = health.good_search || {};
+  if (goodSearch.reachable) {
+    els.goodSearchStatus.textContent = `Good-search: ${goodSearch.search_tool || "connected"}`;
+    els.goodSearchStatus.className = "status-pill ok";
+    els.goodSearchStatus.title = `${goodSearch.mcp_url}\nTools: ${(goodSearch.tools || []).join(", ")}`;
+  } else {
+    els.goodSearchStatus.textContent = "Good-search: offline";
+    els.goodSearchStatus.className = "status-pill warn";
+    els.goodSearchStatus.title = goodSearch.error || "Not reachable";
+  }
+
+  els.ollamaStatus.textContent = `Ollama: ${health.model || "configured"}`;
+  els.ollamaStatus.className = "status-pill ok";
+  els.ollamaStatus.title = health.ollama || "";
 }
 
 function renderStats(stats) {
