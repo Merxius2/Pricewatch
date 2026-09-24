@@ -100,6 +100,8 @@ curl http://localhost:8080/health
 | `PRICEWATCH_GOOD_SEARCH_TIMEOUT_SECONDS` | `120` | MCP request timeout |
 | `PRICEWATCH_CHECK_INTERVAL_MINUTES` | `60` | Default scheduler interval |
 
+When adding a product, set a **preferred website** (e.g. `bol.com`) and optionally a direct product page URL. Pricewatch checks that site first, then searches other websites via DuckDuckGo. If the LLM is uncertain whether an external listing is the same product, it creates a **match review** on the dashboard for you to confirm or reject.
+
 ## API
 
 | Method | Path | Description |
