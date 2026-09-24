@@ -1,0 +1,15 @@
+[Unit]
+Description=Pricewatch price tracking dashboard
+After=network.target ollama.service
+
+[Service]
+Type=simple
+User=pricewatch
+WorkingDirectory=/opt/pricewatch
+EnvironmentFile=/opt/pricewatch/.env
+ExecStart=/opt/pricewatch/.venv/bin/pricewatch
+Restart=on-failure
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

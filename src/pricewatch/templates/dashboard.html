@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Pricewatch</title>
+  <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+  <div class="app">
+    <header class="header">
+      <div class="brand">
+        <div class="brand-icon">◉</div>
+        <div>
+          <h1>Pricewatch</h1>
+          <p class="subtitle">Local price tracking with Ollama + Good Search</p>
+        </div>
+      </div>
+      <div class="header-actions">
+        <button id="check-all-btn" class="btn btn-secondary">Check all now</button>
+        <button id="add-item-btn" class="btn btn-primary">+ Add product</button>
+      </div>
+    </header>
+
+    <section class="stats-grid" id="stats-grid">
+      <article class="stat-card">
+        <span class="stat-label">Tracked</span>
+        <strong class="stat-value" id="stat-total">0</strong>
+      </article>
+      <article class="stat-card">
+        <span class="stat-label">Active</span>
+        <strong class="stat-value" id="stat-enabled">0</strong>
+      </article>
+      <article class="stat-card accent">
+        <span class="stat-label">Alerts</span>
+        <strong class="stat-value" id="stat-alerts">0</strong>
+      </article>
+      <article class="stat-card">
+        <span class="stat-label">Last scheduler run</span>
+        <strong class="stat-value stat-small" id="stat-last-run">Never</strong>
+      </article>
+    </section>
+
+    <section class="panel">
+      <div class="panel-header">
+        <h2>Tracked products</h2>
+        <input type="search" id="search-input" placeholder="Filter by name, tag, or query..." />
+      </div>
+      <div id="items-container" class="items-grid"></div>
+      <div id="empty-state" class="empty-state hidden">
+        <h3>No products yet</h3>
+        <p>Add your first product to start watching prices.</p>
+        <button class="btn btn-primary" id="empty-add-btn">Add product</button>
+      </div>
+    </section>
+  </div>
+
+  <dialog id="item-dialog">
+    <form id="item-form" method="dialog">
+      <div class="dialog-header">
+        <h2 id="dialog-title">Add product</h2>
+        <button type="button" class="icon-btn" id="close-dialog" aria-label="Close">×</button>
+      </div>
+
+      <div class="form-grid">
+        <label>
+          Product name
+          <input name="name" required maxlength="255" placeholder="Sony WH-1000XM5">
+        </label>
+
+        <label>
+          Search query
+          <input name="search_query" required maxlength="512" placeholder="Sony WH-1000XM5 price buy">
+        </label>
+
+        <label class="full-width">
+          Product URL (optional)
+          <input name="product_url" type="url" placeholder="https://store.example.com/product">
+        </label>
+
+        <label>
+          Alert type
+          <select name="alert_type">
+            <option value="threshold">Price at or below target</option>
+            <option value="any_drop">Any price drop</option>
+            <option value="percent_drop">Percent drop</option>
+          </select>
+        </label>
+
+        <label>
+          Target price
+          <input name="target_price" type="number" min="0" step="0.01" placeholder="299.99">
+        </label>
+
+        <label id="percent-drop-field" class="hidden">
+          Percent drop threshold
+          <input name="percent_drop" type="number" min="0" max="100" step="0.1" placeholder="10">
+        </label>
+
+        <label>
+          Currency
+          <input name="currency" value="USD" maxlength="8">
+        </label>
+
+        <label>
+          Check interval (minutes)
+          <input name="check_interval_minutes" type="number" min="5" placeholder="60">
+        </label>
+
+        <label class="full-width">
+          Tags (comma-separated)
+          <input name="tags" placeholder="headphones, electronics">
+        </label>
+
+        <label class="full-width">
+          Notes
+          <textarea name="notes" rows="3" placeholder="Optional notes"></textarea>
+        </label>
+
+        <label class="checkbox-field full-width">
+          <input type="checkbox" name="enabled" checked>
+          Enabled for automatic checks
+        </label>
+      </div>
+
+      <div class="dialog-actions">
+        <button type="button" class="btn btn-secondary" id="cancel-dialog">Cancel</button>
+        <button type="submit" class="btn btn-primary" id="save-item-btn">Save product</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="history-dialog">
+    <div class="dialog-header">
+      <h2 id="history-title">Price history</h2>
+      <button type="button" class="icon-btn" id="close-history" aria-label="Close">×</button>
+    </div>
+    <div id="history-content" class="history-list"></div>
+  </dialog>
+
+  <div id="toast" class="toast hidden"></div>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>
