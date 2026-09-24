@@ -40,9 +40,21 @@
         <strong class="stat-value" id="stat-alerts">0</strong>
       </article>
       <article class="stat-card">
+        <span class="stat-label">Match reviews</span>
+        <strong class="stat-value" id="stat-reviews">0</strong>
+      </article>
+      <article class="stat-card">
         <span class="stat-label">Last scheduler run</span>
         <strong class="stat-value stat-small" id="stat-last-run">Never</strong>
       </article>
+    </section>
+
+    <section class="panel hidden" id="reviews-panel">
+      <div class="panel-header">
+        <h2>Confirm product matches</h2>
+        <p class="panel-note">The LLM found these listings on other websites but isn't sure they're the same product.</p>
+      </div>
+      <div id="reviews-container" class="reviews-list"></div>
     </section>
 
     <section class="panel">
@@ -73,13 +85,23 @@
         </label>
 
         <label>
+          Preferred website
+          <input name="preferred_site" maxlength="255" placeholder="bol.com or https://www.bol.com">
+        </label>
+
+        <label>
           Search query
-          <input name="search_query" required maxlength="512" placeholder="Sony WH-1000XM5 price buy">
+          <input name="search_query" required maxlength="512" placeholder="Sony WH-1000XM5 price">
         </label>
 
         <label class="full-width">
-          Product URL (optional)
-          <input name="product_url" type="url" placeholder="https://store.example.com/product">
+          Product page on preferred site (optional)
+          <input name="product_url" type="url" placeholder="https://www.bol.com/nl/p/product/...">
+        </label>
+
+        <label class="checkbox-field full-width">
+          <input type="checkbox" name="also_search_other_sites" checked>
+          Also search other websites and ask me when the product match is uncertain
         </label>
 
         <label>

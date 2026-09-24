@@ -17,6 +17,8 @@ It provides a web dashboard to add, edit, and remove tracked products, then peri
 - **Price history** — store and review past checks per product
 - **Ollama integration** — local LLM extracts structured price data from page content
 - **Good-search integration** — stealth-browser `scrape` tool via Tailscale Funnel MCP URL
+- **Preferred website** — check a site you choose first, then optionally search other retailers
+- **Product match reviews** — dashboard prompts when the LLM isn't sure two listings are the same product
 
 ## Architecture
 

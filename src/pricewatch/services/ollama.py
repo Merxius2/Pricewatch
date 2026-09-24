@@ -12,22 +12,42 @@ class OllamaError(Exception):
     pass
 
 
-PRICE_EXTRACTION_PROMPT = """You are a price extraction assistant. Given product search results and page content,
-identify the current retail price for the requested product.
+PRICE_EXTRACTION_PROMPT = """You are a price extraction assistant. Given product page content,
+identify the current retail price for the requested product on that specific page.
 
 Respond with ONLY valid JSON in this exact shape:
 {
   "price": 123.45,
-  "currency": "USD",
+  "currency": "EUR",
   "confidence": "high",
+  "product_title": "Exact product title shown on the page",
   "summary": "One sentence explaining where you found the price"
 }
 
 Rules:
 - price must be a number without currency symbols
 - if no reliable price is found, set price to null and confidence to "none"
-- prefer the official retailer or manufacturer price over marketplace listings
+- only extract the price for the main product on the page, not accessories or bundles unless the page is clearly for a bundle
 - ignore shipping, tax, or subscription fees unless they are the only price shown
+"""
+
+
+PRODUCT_MATCH_PROMPT = """You compare whether a product listing found on another website is the same product
+as the one the user is tracking.
+
+Respond with ONLY valid JSON in this exact shape:
+{
+  "same_product": true,
+  "confidence": "high",
+  "reason": "Short explanation comparing model, variant, color, storage, etc."
+}
+
+Confidence rules:
+- "high": clearly the same product (same model/variant)
+- "medium": likely the same but variant details are ambiguous (e.g. color unknown)
+- "low": probably a different variant, bundle, refurbished item, or unrelated listing
+
+Set same_product to false when confidence would be low.
 """
 
 
@@ -42,19 +62,47 @@ class OllamaClient:
         product_name: str,
         search_query: str,
         context: str,
+        source_url: str | None = None,
         currency_hint: str = "USD",
     ) -> dict:
+        source_line = f"Page URL: {source_url}\n" if source_url else ""
         user_message = (
-            f"Product: {product_name}\n"
+            f"Product being tracked: {product_name}\n"
             f"Search query: {search_query}\n"
-            f"Expected currency: {currency_hint}\n\n"
-            f"Source material:\n{context[:16000]}"
+            f"Expected currency: {currency_hint}\n"
+            f"{source_line}\n"
+            f"Page content:\n{context[:16000]}"
         )
+        return await self._chat_json(PRICE_EXTRACTION_PROMPT, user_message)
 
+    async def compare_product_match(
+        self,
+        *,
+        tracked_name: str,
+        search_query: str,
+        reference_context: str,
+        candidate_url: str,
+        candidate_site: str,
+        candidate_title: str | None,
+        candidate_content: str,
+    ) -> dict:
+        user_message = (
+            f"Tracked product name: {tracked_name}\n"
+            f"Search query: {search_query}\n\n"
+            f"Reference listing (preferred/known product):\n{reference_context[:6000]}\n\n"
+            f"Candidate listing:\n"
+            f"Site: {candidate_site}\n"
+            f"URL: {candidate_url}\n"
+            f"Title: {candidate_title or 'Unknown'}\n"
+            f"Content:\n{candidate_content[:8000]}"
+        )
+        return await self._chat_json(PRODUCT_MATCH_PROMPT, user_message)
+
+    async def _chat_json(self, system_prompt: str, user_message: str) -> dict:
         payload = {
             "model": self.model,
             "messages": [
-                {"role": "system", "content": PRICE_EXTRACTION_PROMPT},
+                {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_message},
             ],
             "stream": False,

@@ -1,5 +1,6 @@
 const state = {
   items: [],
+  reviews: [],
   editingId: null,
   filter: "",
 };
@@ -8,7 +9,10 @@ const els = {
   statsTotal: document.getElementById("stat-total"),
   statsEnabled: document.getElementById("stat-enabled"),
   statsAlerts: document.getElementById("stat-alerts"),
+  statsReviews: document.getElementById("stat-reviews"),
   statsLastRun: document.getElementById("stat-last-run"),
+  reviewsPanel: document.getElementById("reviews-panel"),
+  reviewsContainer: document.getElementById("reviews-container"),
   itemsContainer: document.getElementById("items-container"),
   emptyState: document.getElementById("empty-state"),
   searchInput: document.getElementById("search-input"),
@@ -57,14 +61,17 @@ async function api(path, options = {}) {
 }
 
 async function loadDashboard() {
-  const [stats, items, health] = await Promise.all([
+  const [stats, items, reviews, health] = await Promise.all([
     api("/api/stats"),
     api("/api/items"),
+    api("/api/match-reviews"),
     api("/health"),
   ]);
   state.items = items;
+  state.reviews = reviews;
   renderStats(stats);
   renderServiceStatus(health);
+  renderReviews();
   renderItems();
 }
 
@@ -91,7 +98,33 @@ function renderStats(stats) {
   els.statsTotal.textContent = stats.total_items;
   els.statsEnabled.textContent = stats.enabled_items;
   els.statsAlerts.textContent = stats.alerts_active;
+  els.statsReviews.textContent = stats.pending_match_reviews;
   els.statsLastRun.textContent = formatDate(stats.last_run_at);
+}
+
+function renderReviews() {
+  els.reviewsContainer.innerHTML = "";
+  els.reviewsPanel.classList.toggle("hidden", state.reviews.length === 0);
+
+  state.reviews.forEach((review) => {
+    const card = document.createElement("article");
+    card.className = "review-card";
+    card.innerHTML = `
+      <h3>Is this the same product as ${escapeHtml(review.item_name || "your item")}?</h3>
+      <div class="review-meta">
+        <strong>${escapeHtml(review.found_title || "Unknown listing")}</strong><br>
+        ${escapeHtml(review.found_site)} · ${formatMoney(review.found_price, review.found_currency || "EUR")}
+      </div>
+      <div class="review-meta">${escapeHtml(review.match_reason || "")}</div>
+      <div class="review-meta"><a href="${escapeHtml(review.found_url)}" target="_blank" rel="noreferrer">${escapeHtml(review.found_url)}</a></div>
+      ${review.page_excerpt ? `<div class="review-meta">${escapeHtml(review.page_excerpt.slice(0, 280))}...</div>` : ""}
+      <div class="review-actions">
+        <button class="btn btn-primary" data-review-action="confirm" data-id="${review.id}">Yes, same product</button>
+        <button class="btn btn-secondary" data-review-action="reject" data-id="${review.id}">No, different product</button>
+      </div>
+    `;
+    els.reviewsContainer.appendChild(card);
+  });
 }
 
 function alertLabel(item) {
@@ -146,7 +179,10 @@ function renderItems() {
       </div>
       <div class="badges">
         <span class="badge">${alertLabel(item)}</span>
+        ${item.preferred_site ? `<span class="badge">Preferred ${escapeHtml(item.preferred_site)}</span>` : ""}
+        ${item.current_source_site ? `<span class="badge">Best on ${escapeHtml(item.current_source_site)}</span>` : ""}
         ${item.lowest_price != null ? `<span class="badge">Low ${formatMoney(item.lowest_price, item.currency)}</span>` : ""}
+        ${item.pending_match_reviews ? `<span class="badge warning">${item.pending_match_reviews} review(s)</span>` : ""}
         ${item.tags ? `<span class="badge">${escapeHtml(item.tags)}</span>` : ""}
       </div>
       <div class="item-meta">Last checked: ${formatDate(item.last_checked_at)}</div>
@@ -175,14 +211,16 @@ function openDialog(item = null) {
   els.dialogTitle.textContent = item ? "Edit product" : "Add product";
   els.itemForm.reset();
   els.itemForm.enabled.checked = true;
+  els.itemForm.also_search_other_sites.checked = true;
   els.itemForm.currency.value = "USD";
 
   if (item) {
-    for (const field of ["name", "search_query", "product_url", "target_price", "percent_drop", "currency", "tags", "notes", "check_interval_minutes"]) {
+    for (const field of ["name", "preferred_site", "search_query", "product_url", "target_price", "percent_drop", "currency", "tags", "notes", "check_interval_minutes"]) {
       if (item[field] != null) els.itemForm[field].value = item[field];
     }
     els.itemForm.alert_type.value = item.alert_type;
     els.itemForm.enabled.checked = item.enabled;
+    els.itemForm.also_search_other_sites.checked = item.also_search_other_sites;
   }
 
   togglePercentField();
@@ -198,6 +236,8 @@ function formPayload() {
   const form = new FormData(els.itemForm);
   const payload = Object.fromEntries(form.entries());
   payload.enabled = Boolean(els.itemForm.enabled.checked);
+  payload.also_search_other_sites = Boolean(els.itemForm.also_search_other_sites.checked);
+  payload.preferred_site = payload.preferred_site || null;
   payload.target_price = payload.target_price ? Number(payload.target_price) : null;
   payload.percent_drop = payload.percent_drop ? Number(payload.percent_drop) : null;
   payload.check_interval_minutes = payload.check_interval_minutes
@@ -247,10 +287,12 @@ async function deleteItem(id) {
 async function checkItem(id) {
   try {
     const result = await api(`/api/items/${id}/check`, { method: "POST" });
+    const site = result.source_site ? ` on ${result.source_site}` : "";
+    const reviews = result.pending_reviews ? ` · ${result.pending_reviews} match review(s)` : "";
     showToast(
       result.success
-        ? `Checked: ${formatMoney(result.price, result.currency || "USD")}${result.alert_triggered ? " — alert!" : ""}`
-        : result.message || "Check failed",
+        ? `Checked: ${formatMoney(result.price, result.currency || "USD")}${site}${result.alert_triggered ? " — alert!" : ""}${reviews}`
+        : `${result.message || "Check failed"}${reviews}`,
       result.success ? "success" : "error",
     );
     await loadDashboard();
@@ -269,6 +311,7 @@ async function showHistory(id) {
           <div class="history-item">
             <strong>${formatMoney(entry.price, entry.currency)}</strong>
             <div class="item-meta">${formatDate(entry.checked_at)} · ${entry.status}</div>
+            ${entry.source_site ? `<div class="item-meta">Site: ${escapeHtml(entry.source_site)}</div>` : ""}
             ${entry.source_url ? `<div class="item-meta"><a href="${escapeHtml(entry.source_url)}" target="_blank" rel="noreferrer">${escapeHtml(entry.source_url)}</a></div>` : ""}
             ${entry.error ? `<div class="item-meta" style="color: var(--danger)">${escapeHtml(entry.error)}</div>` : ""}
           </div>
@@ -304,6 +347,22 @@ document.getElementById("check-all-btn").addEventListener("click", async () => {
   } finally {
     button.disabled = false;
   }
+});
+
+async function resolveReview(id, action) {
+  try {
+    await api(`/api/match-reviews/${id}/${action}`, { method: "POST" });
+    showToast(action === "confirm" ? "Product match confirmed" : "Listing rejected");
+    await loadDashboard();
+  } catch (error) {
+    showToast(error.message, "error");
+  }
+}
+
+els.reviewsContainer.addEventListener("click", (event) => {
+  const button = event.target.closest("button[data-review-action]");
+  if (!button) return;
+  resolveReview(Number(button.dataset.id), button.dataset.reviewAction);
 });
 
 els.itemsContainer.addEventListener("click", (event) => {
