@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Pricewatch — Dashboard Mockup</title>
+  <link rel="stylesheet" href="../../src/pricewatch/static/styles.css">
+</head>
+<body>
+  <div class="app">
+    <header class="header">
+      <div class="brand">
+        <div class="brand-icon">◉</div>
+        <div>
+          <h1>Pricewatch</h1>
+          <p class="subtitle">Local price tracking with Ollama + Good-search MCP</p>
+        </div>
+      </div>
+      <div class="header-actions">
+        <div class="service-status">
+          <span class="status-pill ok">Good-search: scrape</span>
+          <span class="status-pill ok">Ollama: llama3.2</span>
+        </div>
+        <button class="btn btn-secondary">Check all now</button>
+        <button class="btn btn-primary">+ Add product</button>
+      </div>
+    </header>
+
+    <section class="stats-grid">
+      <article class="stat-card">
+        <span class="stat-label">Tracked</span>
+        <strong class="stat-value">4</strong>
+      </article>
+      <article class="stat-card">
+        <span class="stat-label">Active</span>
+        <strong class="stat-value">3</strong>
+      </article>
+      <article class="stat-card accent">
+        <span class="stat-label">Alerts</span>
+        <strong class="stat-value">1</strong>
+      </article>
+      <article class="stat-card">
+        <span class="stat-label">Last scheduler run</span>
+        <strong class="stat-value stat-small">Today, 2:14 PM</strong>
+      </article>
+    </section>
+
+    <section class="panel">
+      <div class="panel-header">
+        <h2>Tracked products</h2>
+        <input type="search" placeholder="Filter by name, tag, or query..." value="">
+      </div>
+
+      <div class="items-grid">
+        <article class="item-card alert">
+          <div class="item-top">
+            <div>
+              <div class="item-title">Sony WH-1000XM5</div>
+              <div class="item-meta">Sony WH-1000XM5 price bol.com mediamarkt</div>
+            </div>
+            <div class="badges">
+              <span class="badge warning">Alert</span>
+              <span class="badge success">success</span>
+              <span class="badge success">Enabled</span>
+            </div>
+          </div>
+          <div class="price-row">
+            <span class="current-price">€279.00</span>
+            <span class="price-delta down">↓ €20.00</span>
+          </div>
+          <div class="badges">
+            <span class="badge">Target €299.00</span>
+            <span class="badge">Low €279.00</span>
+            <span class="badge">headphones, electronics</span>
+          </div>
+          <div class="item-meta">Last checked: Today, 2:14 PM</div>
+          <div class="card-actions">
+            <button class="btn btn-secondary">Check now</button>
+            <button class="btn btn-ghost">History</button>
+            <button class="btn btn-ghost">Edit</button>
+            <button class="btn btn-danger">Delete</button>
+          </div>
+        </article>
+
+        <article class="item-card">
+          <div class="item-top">
+            <div>
+              <div class="item-title">Philips Hue Starter Kit</div>
+              <div class="item-meta">Philips Hue E27 starter kit price</div>
+            </div>
+            <div class="badges">
+              <span class="badge success">success</span>
+              <span class="badge success">Enabled</span>
+            </div>
+          </div>
+          <div class="price-row">
+            <span class="current-price">€89.99</span>
+            <span class="price-delta down">↓ €5.00</span>
+          </div>
+          <div class="badges">
+            <span class="badge">Target €95.00</span>
+            <span class="badge">Low €89.99</span>
+            <span class="badge">smart home</span>
+          </div>
+          <div class="item-meta">Last checked: Today, 1:14 PM</div>
+          <div class="card-actions">
+            <button class="btn btn-secondary">Check now</button>
+            <button class="btn btn-ghost">History</button>
+            <button class="btn btn-ghost">Edit</button>
+            <button class="btn btn-danger">Delete</button>
+          </div>
+        </article>
+
+        <article class="item-card">
+          <div class="item-top">
+            <div>
+              <div class="item-title">NVIDIA RTX 4070 Super</div>
+              <div class="item-meta">RTX 4070 Super graphics card buy price</div>
+            </div>
+            <div class="badges">
+              <span class="badge success">success</span>
+              <span class="badge success">Enabled</span>
+            </div>
+          </div>
+          <div class="price-row">
+            <span class="current-price">€589.00</span>
+            <span class="price-delta up">↑ €15.00</span>
+          </div>
+          <div class="badges">
+            <span class="badge">Alert on 10% drop</span>
+            <span class="badge">Low €574.00</span>
+            <span class="badge">pc parts</span>
+          </div>
+          <div class="item-meta">Last checked: Today, 1:14 PM</div>
+          <div class="card-actions">
+            <button class="btn btn-secondary">Check now</button>
+            <button class="btn btn-ghost">History</button>
+            <button class="btn btn-ghost">Edit</button>
+            <button class="btn btn-danger">Delete</button>
+          </div>
+        </article>
+
+        <article class="item-card disabled">
+          <div class="item-top">
+            <div>
+              <div class="item-title">Kindle Paperwhite</div>
+              <div class="item-meta">Kindle Paperwhite 2024 price amazon</div>
+            </div>
+            <div class="badges">
+              <span class="badge success">success</span>
+              <span class="badge">Paused</span>
+            </div>
+          </div>
+          <div class="price-row">
+            <span class="current-price">€139.99</span>
+          </div>
+          <div class="badges">
+            <span class="badge">Target €129.99</span>
+            <span class="badge">Low €134.99</span>
+            <span class="badge">books</span>
+          </div>
+          <div class="item-meta">Last checked: Yesterday, 6:30 PM</div>
+          <div class="card-actions">
+            <button class="btn btn-secondary">Check now</button>
+            <button class="btn btn-ghost">History</button>
+            <button class="btn btn-ghost">Edit</button>
+            <button class="btn btn-danger">Delete</button>
+          </div>
+        </article>
+      </div>
+    </section>
+  </div>
+</body>
+</html>
