@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import re
 from typing import Any
+from urllib.parse import quote_plus
 
 import httpx
 
@@ -13,14 +14,9 @@ class GoodSearchError(Exception):
     pass
 
 
-SEARCH_TOOL_HINTS = ("search", "google_search", "web_search", "query")
-FETCH_TOOL_HINTS = ("fetch", "read", "contents", "get_page", "webfetch", "web_fetch", "parse")
 DEFAULT_MCP_CANDIDATES = (
     "http://127.0.0.1:8765/mcp",
     "http://127.0.0.1:8420/mcp",
-    "http://127.0.0.1:3000/mcp",
-    "http://127.0.0.1:8081/mcp",
-    "http://127.0.0.1:9000/mcp",
 )
 
 _resolved_mcp_url: str | None = None
@@ -28,35 +24,39 @@ _resolved_health: dict[str, Any] | None = None
 
 
 def mcp_url_candidates(settings: Settings) -> list[str]:
+    configured = settings.good_search_mcp_url.strip().rstrip("/")
+    if configured and not settings.good_search_auto_discover:
+        return [configured]
+
     if settings.good_search_mcp_url_candidates.strip():
-        return [
+        custom = [
             url.strip().rstrip("/")
             for url in settings.good_search_mcp_url_candidates.split(",")
             if url.strip()
         ]
+        ordered = ([configured] if configured else []) + custom
+    else:
+        ordered = ([configured] if configured else []) + list(DEFAULT_MCP_CANDIDATES)
 
-    ordered = [settings.good_search_mcp_url.rstrip("/"), *DEFAULT_MCP_CANDIDATES]
     seen: set[str] = set()
     unique: list[str] = []
     for url in ordered:
-        if url not in seen:
+        if url and url not in seen:
             seen.add(url)
             unique.append(url)
     return unique
 
 
 class GoodSearchClient:
-    """Client for the local Good-search MCP service (stealth browser search + parsing)."""
+    """Client for the Good-search MCP service (stealth browser scrape + browse tools)."""
 
     def __init__(self, settings: Settings) -> None:
         self.settings = settings
-        self.mcp_url = (_resolved_mcp_url or settings.good_search_mcp_url).rstrip("/")
-        self.search_tool = settings.good_search_search_tool
-        self.fetch_tool = settings.good_search_fetch_tool
+        self.mcp_url = (_resolved_mcp_url or settings.good_search_mcp_url).strip().rstrip("/")
+        self.scrape_tool = settings.good_search_scrape_tool or "scrape"
         self.timeout = settings.good_search_timeout_seconds
         self._session_id: str | None = None
         self._request_id = 0
-        self._discovered_tools: dict[str, str] | None = None
 
     @classmethod
     def cached_health(cls) -> dict[str, Any] | None:
@@ -68,73 +68,67 @@ class GoodSearchClient:
         if _resolved_health is not None:
             return _resolved_health
 
-        try:
-            health = await self.health_check()
-        except GoodSearchError as first_error:
-            if not self.settings.good_search_auto_discover:
-                raise GoodSearchError(
-                    f"Good-search MCP is not reachable at {self.mcp_url}: {first_error}"
-                ) from first_error
-
-            last_error = first_error
-            for candidate in mcp_url_candidates(self.settings):
-                if candidate == self.mcp_url:
-                    continue
-                probe = GoodSearchClient(self.settings)
-                probe.mcp_url = candidate
-                try:
-                    health = await probe.health_check()
-                    self.mcp_url = candidate
-                    _resolved_mcp_url = candidate
-                    _resolved_health = health
-                    return health
-                except GoodSearchError as exc:
-                    last_error = exc
-
+        if not mcp_url_candidates(self.settings):
             raise GoodSearchError(
-                "Good-search MCP is not reachable on this host. "
-                f"Tried: {', '.join(mcp_url_candidates(self.settings))}. "
-                f"Last error: {last_error}"
-            ) from last_error
+                "Good-search MCP URL is not configured. Set PRICEWATCH_GOOD_SEARCH_MCP_URL in .env"
+            )
 
-        _resolved_mcp_url = self.mcp_url
-        _resolved_health = health
-        return health
+        last_error: Exception | None = None
+        for candidate in mcp_url_candidates(self.settings):
+            probe = GoodSearchClient(self.settings)
+            probe.mcp_url = candidate
+            try:
+                health = await probe.health_check()
+                self.mcp_url = candidate
+                _resolved_mcp_url = candidate
+                _resolved_health = health
+                return health
+            except GoodSearchError as exc:
+                last_error = exc
 
-    def _reset_session(self) -> None:
-        self._session_id = None
-        self._request_id = 0
-        self._discovered_tools = None
+        raise GoodSearchError(
+            "Good-search MCP is not reachable. "
+            f"Tried: {', '.join(mcp_url_candidates(self.settings))}. "
+            f"Last error: {last_error}"
+        ) from last_error
 
     async def search(self, query: str, limit: int = 5) -> list[dict[str, Any]]:
         await self.ensure_connected()
-        tool_name = await self._resolve_tool("search", self.search_tool, SEARCH_TOOL_HINTS)
-        result = await self._call_tool(
-            tool_name,
-            {
-                "query": query,
-                "limit": limit,
-                "count": limit,
-            },
+        search_url = self.settings.good_search_search_url_template.format(
+            query=quote_plus(query)
         )
-        return self._parse_search_results(result)
+        payload = await self._scrape(search_url)
+        results = self._parse_search_page(payload)
+        return results[:limit]
 
     async def fetch_contents(self, url: str) -> str:
         await self.ensure_connected()
-        tool_name = await self._resolve_tool("fetch", self.fetch_tool, FETCH_TOOL_HINTS)
-        result = await self._call_tool(tool_name, {"url": url})
-        return self._extract_text(result)
+        payload = await self._scrape(url)
+        if payload.get("blocked"):
+            raise GoodSearchError(
+                f"Good-search could not access {url} (blocked by anti-bot protection)"
+            )
+        content = payload.get("content") or ""
+        if not content.strip():
+            raise GoodSearchError(f"No content returned for {url}")
+        return content
 
     async def health_check(self) -> dict[str, Any]:
+        if not self.mcp_url:
+            raise GoodSearchError("Good-search MCP URL is not configured")
+
         tools = await self._list_tools()
-        search_tool = await self._resolve_tool("search", self.search_tool, SEARCH_TOOL_HINTS)
-        fetch_tool = await self._resolve_tool("fetch", self.fetch_tool, FETCH_TOOL_HINTS)
+        tool_names = [tool.get("name") for tool in tools if tool.get("name")]
+        if self.scrape_tool not in tool_names:
+            raise GoodSearchError(
+                f"Expected scrape tool '{self.scrape_tool}' not found. Available: {', '.join(tool_names)}"
+            )
+
         return {
             "reachable": True,
-            "mcp_url": self.mcp_url,
-            "tools": [tool.get("name") for tool in tools],
-            "search_tool": search_tool,
-            "fetch_tool": fetch_tool,
+            "mcp_url": self._safe_mcp_url(),
+            "tools": tool_names,
+            "scrape_tool": self.scrape_tool,
         }
 
     async def gather_product_context(
@@ -174,49 +168,79 @@ class GoodSearchClient:
 
         return combined, primary_url
 
-    async def _resolve_tool(
-        self,
-        kind: str,
-        configured: str,
-        hints: tuple[str, ...],
-    ) -> str:
-        if configured:
-            return configured
-
-        discovered = await self._discover_tools()
-        if kind in discovered:
-            return discovered[kind]
-
-        available = [tool.get("name", "") for tool in await self._list_tools()]
-        raise GoodSearchError(
-            f"Could not find a Good-search {kind} tool. "
-            f"Available tools: {', '.join(available) or 'none'}. "
-            f"Set PRICEWATCH_GOOD_SEARCH_{kind.upper()}_TOOL if needed."
+    async def _scrape(self, url: str) -> dict[str, Any]:
+        result = await self._call_tool(
+            self.scrape_tool,
+            {
+                "url": url,
+                "format": "text",
+                "maxChars": self.settings.good_search_max_chars,
+                "maxAgeSec": 0,
+                "maxTier": self.settings.good_search_max_tier,
+            },
         )
+        payload = self._parse_scrape_payload(result)
+        if payload.get("blocked"):
+            raise GoodSearchError(
+                f"Good-search was blocked loading {url}. "
+                "The site refused the browser — price could not be verified."
+            )
+        return payload
 
-    async def _discover_tools(self) -> dict[str, str]:
-        if self._discovered_tools is not None:
-            return self._discovered_tools
+    def _parse_scrape_payload(self, payload: Any) -> dict[str, Any]:
+        if isinstance(payload, dict) and "blocked" in payload and isinstance(payload.get("content"), str):
+            return payload
 
-        tools = await self._list_tools()
-        discovered: dict[str, str] = {}
+        text = self._extract_text(payload)
+        if not text:
+            return {}
 
-        for tool in tools:
-            name = (tool.get("name") or "").lower()
-            if "search" in name and "search" not in discovered:
-                discovered["search"] = tool["name"]
-            if any(hint in name for hint in FETCH_TOOL_HINTS) and "fetch" not in discovered:
-                discovered["fetch"] = tool["name"]
+        try:
+            parsed = json.loads(text)
+        except json.JSONDecodeError:
+            return {"content": text}
 
-        for tool in tools:
-            name = (tool.get("name") or "").lower()
-            if name in SEARCH_TOOL_HINTS and "search" not in discovered:
-                discovered["search"] = tool["name"]
-            if name in FETCH_TOOL_HINTS and "fetch" not in discovered:
-                discovered["fetch"] = tool["name"]
+        if isinstance(parsed, dict):
+            return parsed
+        return {"content": text}
 
-        self._discovered_tools = discovered
-        return discovered
+    def _parse_search_page(self, payload: dict[str, Any]) -> list[dict[str, Any]]:
+        raw_content = payload.get("content") or ""
+        if isinstance(raw_content, list):
+            content = "\n".join(str(part) for part in raw_content)
+        else:
+            content = str(raw_content)
+        if not content.strip():
+            return []
+
+        results: list[dict[str, Any]] = []
+        url_pattern = re.compile(r"(?:https?://|www\.)[^\s)>\"']+")
+
+        for match in url_pattern.finditer(content):
+            raw_url = match.group(0).rstrip(".,;")
+            url = raw_url if raw_url.startswith("http") else f"https://{raw_url}"
+            prefix = content[max(0, match.start() - 140) : match.start()].strip()
+            title = prefix.split("\n")[-1].strip(" -:\t") or "Result"
+            if len(title) < 3 or "duckduckgo.com" in url:
+                continue
+            snippet = content[match.start() : min(len(content), match.end() + 120)].strip()
+            results.append({"title": title, "url": url, "snippet": snippet})
+
+        deduped: list[dict[str, Any]] = []
+        seen_urls: set[str] = set()
+        for result in results:
+            if result["url"] in seen_urls:
+                continue
+            seen_urls.add(result["url"])
+            deduped.append(result)
+        return deduped
+
+    def _safe_mcp_url(self) -> str:
+        """Hide the Tailscale secret path segment in logs and API responses."""
+        if "/mcp/" in self.mcp_url:
+            base, _, _secret = self.mcp_url.partition("/mcp/")
+            return f"{base}/mcp/<secret>"
+        return self.mcp_url
 
     async def _list_tools(self) -> list[dict[str, Any]]:
         payload = await self._rpc("tools/list", {})
@@ -252,7 +276,7 @@ class GoodSearchClient:
 
                 response = await client.post(self.mcp_url, headers=headers, json=body)
             except httpx.HTTPError as exc:
-                raise GoodSearchError(f"Good-search MCP unreachable at {self.mcp_url}: {exc}") from exc
+                raise GoodSearchError(f"Good-search MCP unreachable at {self._safe_mcp_url()}: {exc}") from exc
 
             if response.status_code >= 400:
                 raise GoodSearchError(
@@ -285,7 +309,7 @@ class GoodSearchClient:
         try:
             response = await client.post(self.mcp_url, headers=headers, json=init_body)
         except httpx.HTTPError as exc:
-            raise GoodSearchError(f"Good-search MCP unreachable at {self.mcp_url}: {exc}") from exc
+            raise GoodSearchError(f"Good-search MCP unreachable at {self._safe_mcp_url()}: {exc}") from exc
 
         if response.status_code >= 400:
             raise GoodSearchError(
@@ -357,46 +381,3 @@ class GoodSearchClient:
             return json.dumps(payload, indent=2)
 
         return str(payload)
-
-    def _parse_search_results(self, payload: Any) -> list[dict[str, Any]]:
-        if isinstance(payload, list):
-            return [item for item in payload if isinstance(item, dict)]
-
-        text = self._extract_text(payload)
-        if not text:
-            return []
-
-        try:
-            parsed = json.loads(text)
-        except json.JSONDecodeError:
-            return self._parse_search_results_from_text(text)
-
-        if isinstance(parsed, list):
-            return [item for item in parsed if isinstance(item, dict)]
-
-        if isinstance(parsed, dict):
-            for key in ("results", "items", "organic", "hits"):
-                value = parsed.get(key)
-                if isinstance(value, list):
-                    return [item for item in value if isinstance(item, dict)]
-
-        return []
-
-    def _parse_search_results_from_text(self, text: str) -> list[dict[str, Any]]:
-        results: list[dict[str, Any]] = []
-        url_pattern = re.compile(r"https?://[^\s)>\"]+")
-        lines = [line.strip() for line in text.splitlines() if line.strip()]
-
-        for line in lines:
-            urls = url_pattern.findall(line)
-            if not urls:
-                continue
-            results.append(
-                {
-                    "title": line.split(urls[0])[0].strip(" -:\t") or "Result",
-                    "url": urls[0],
-                    "snippet": line,
-                }
-            )
-
-        return results

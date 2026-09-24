@@ -73,7 +73,7 @@ function renderServiceStatus(health) {
 
   const goodSearch = health.good_search || {};
   if (goodSearch.reachable) {
-    els.goodSearchStatus.textContent = `Good-search: ${goodSearch.search_tool || "connected"}`;
+    els.goodSearchStatus.textContent = `Good-search: ${goodSearch.scrape_tool || "connected"}`;
     els.goodSearchStatus.className = "status-pill ok";
     els.goodSearchStatus.title = `${goodSearch.mcp_url}\nTools: ${(goodSearch.tools || []).join(", ")}`;
   } else {

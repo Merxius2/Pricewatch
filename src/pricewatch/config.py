@@ -17,11 +17,15 @@ class Settings(BaseSettings):
     ollama_base_url: str = "http://localhost:11434"
     ollama_model: str = "llama3.2"
 
-    good_search_mcp_url: str = "http://127.0.0.1:8765/mcp"
-    good_search_auto_discover: bool = True
+    # Full Good-search MCP URL including the secret path segment (Tailscale Funnel).
+    # Example: https://your-host.tailXXXX.ts.net/mcp/<secret>
+    good_search_mcp_url: str = ""
+    good_search_auto_discover: bool = False
     good_search_mcp_url_candidates: str = ""
-    good_search_search_tool: str = ""
-    good_search_fetch_tool: str = ""
+    good_search_scrape_tool: str = "scrape"
+    good_search_search_url_template: str = "https://html.duckduckgo.com/html/?q={query}"
+    good_search_max_chars: int = 20000
+    good_search_max_tier: int = 2
     good_search_timeout_seconds: float = 120.0
 
     check_interval_minutes: int = 60

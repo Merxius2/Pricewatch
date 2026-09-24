@@ -1,6 +1,8 @@
 # Pricewatch
 
-Pricewatch is a self-hosted price tracking tool designed to run on a Linux mini-PC with a local LLM via [Ollama](https://ollama.com). It provides a web dashboard to add, edit, and remove tracked products, then periodically checks prices using your local **[Good-search](https://github.com/katjabunich/Good-search)** MCP service and Ollama to extract the current price.
+Pricewatch is a self-hosted price tracking tool designed to run with a local LLM via [Ollama](https://ollama.com) and your **[Good-search](https://github.com/katjabunich/Good-search)** MCP server on a Linux mini-PC.
+
+It provides a web dashboard to add, edit, and remove tracked products, then periodically checks prices by scraping live pages through Good-search and extracting prices with Ollama.
 
 ## Features
 
@@ -13,8 +15,8 @@ Pricewatch is a self-hosted price tracking tool designed to run on a Linux mini-
 - **Automatic checks** — background scheduler with global and per-product intervals
 - **Manual checks** — run a check for one product or all enabled products
 - **Price history** — store and review past checks per product
-- **Ollama integration** — local LLM extracts structured price data from search results
-- **Good-search integration** — local stealth-browser search + page parsing via MCP
+- **Ollama integration** — local LLM extracts structured price data from page content
+- **Good-search integration** — stealth-browser `scrape` tool via Tailscale Funnel MCP URL
 
 ## Architecture
 
@@ -27,7 +29,7 @@ FastAPI + SQLite
       ├── Scheduler (APScheduler)
       │
       └── Price checker
-            ├── Good-search MCP (local search + page parsing)
+            ├── Good-search MCP (scrape + browse tools)
             └── Ollama (local LLM price extraction)
 ```
 
@@ -37,15 +39,13 @@ FastAPI + SQLite
 
 - Python 3.11+
 - [Ollama](https://ollama.com) running locally
-- **Good-search MCP already running** on the same host ([setup reference](docs/good-search-setup.md))
+- Good-search MCP installed on your mini-PC ([setup guide](docs/good-search-setup.md))
 
 Pull a model:
 
 ```bash
 ollama pull llama3.2
 ```
-
-Pricewatch auto-connects to the local Good-search MCP on startup.
 
 ### 2. Install Pricewatch
 
@@ -56,14 +56,15 @@ pip install -e .
 cp .env.example .env
 ```
 
-Edit `.env` and set at least:
+Edit `.env` with your Good-search MCP URL from the install output:
 
 ```env
-PRICEWATCH_GOOD_SEARCH_MCP_URL=http://127.0.0.1:8765/mcp
+PRICEWATCH_GOOD_SEARCH_MCP_URL=https://your-host.tailXXXX.ts.net/mcp/your-secret-token
+PRICEWATCH_GOOD_SEARCH_AUTO_DISCOVER=false
 PRICEWATCH_OLLAMA_MODEL=llama3.2
 ```
 
-If auto-discovery cannot find Good-search, set `PRICEWATCH_GOOD_SEARCH_MCP_URL` to the URL printed by your MCP install.
+The MCP URL is a secret — do not commit it.
 
 ### 3. Run
 
@@ -73,7 +74,7 @@ pricewatch
 
 Open `http://localhost:8080` for the dashboard.
 
-Verify dependencies:
+Verify:
 
 ```bash
 curl http://localhost:8080/health
@@ -88,11 +89,12 @@ curl http://localhost:8080/health
 | `PRICEWATCH_DATABASE_URL` | `sqlite:///./data/pricewatch.db` | SQLite database path |
 | `PRICEWATCH_OLLAMA_BASE_URL` | `http://localhost:11434` | Ollama API URL |
 | `PRICEWATCH_OLLAMA_MODEL` | `llama3.2` | Model used for price extraction |
-| `PRICEWATCH_GOOD_SEARCH_MCP_URL` | `http://127.0.0.1:8765/mcp` | Good-search MCP endpoint |
-| `PRICEWATCH_GOOD_SEARCH_AUTO_DISCOVER` | `true` | Probe localhost MCP URLs on startup |
-| `PRICEWATCH_GOOD_SEARCH_MCP_URL_CANDIDATES` | _(built-in list)_ | Comma-separated MCP URLs to probe |
-| `PRICEWATCH_GOOD_SEARCH_SEARCH_TOOL` | _(auto)_ | Override search tool name |
-| `PRICEWATCH_GOOD_SEARCH_FETCH_TOOL` | _(auto)_ | Override fetch/parse tool name |
+| `PRICEWATCH_GOOD_SEARCH_MCP_URL` | _(required)_ | Full Tailscale Funnel MCP URL |
+| `PRICEWATCH_GOOD_SEARCH_AUTO_DISCOVER` | `false` | Probe localhost MCP URLs if true |
+| `PRICEWATCH_GOOD_SEARCH_SCRAPE_TOOL` | `scrape` | Good-search scrape tool name |
+| `PRICEWATCH_GOOD_SEARCH_SEARCH_URL_TEMPLATE` | DuckDuckGo HTML | Search URL template (`{query}`) |
+| `PRICEWATCH_GOOD_SEARCH_MAX_CHARS` | `20000` | Max chars per scrape |
+| `PRICEWATCH_GOOD_SEARCH_MAX_TIER` | `2` | Scrape escalation tier (0–2) |
 | `PRICEWATCH_GOOD_SEARCH_TIMEOUT_SECONDS` | `120` | MCP request timeout |
 | `PRICEWATCH_CHECK_INTERVAL_MINUTES` | `60` | Default scheduler interval |
 
@@ -111,25 +113,7 @@ curl http://localhost:8080/health
 
 ## Deploy on a mini-PC
 
-A sample systemd unit is included at `deploy/pricewatch.service`. Typical setup:
-
-```bash
-sudo useradd --system --home /opt/pricewatch pricewatch
-sudo cp -r . /opt/pricewatch
-sudo cp deploy/pricewatch.service /etc/systemd/system/
-sudo systemctl daemon-reload
-sudo systemctl enable --now pricewatch
-```
-
-Ensure **Good-search MCP** and **Ollama** are already running on the target host before starting Pricewatch.
-
-## Roadmap ideas
-
-- Webhook/email/Telegram notifications when alerts trigger
-- Sparkline charts for price trends on each card
-- Import/export tracked items as JSON or CSV
-- Multi-retailer comparison for the same product
-- Auth for the dashboard when exposed beyond localhost
+A sample systemd unit is included at `deploy/pricewatch.service`. Ensure Ollama is running; Good-search MCP is managed separately.
 
 ## Development
 

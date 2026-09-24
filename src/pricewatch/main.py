@@ -29,10 +29,9 @@ async def _connect_good_search() -> None:
     try:
         health = await client.ensure_connected()
         logger.info(
-            "Good-search MCP ready at %s (search=%s, fetch=%s, tools=%s)",
+            "Good-search MCP ready at %s (scrape=%s, tools=%s)",
             health["mcp_url"],
-            health["search_tool"],
-            health["fetch_tool"],
+            health["scrape_tool"],
             ", ".join(health["tools"]),
         )
     except Exception as exc:  # noqa: BLE001

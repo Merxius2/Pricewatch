@@ -1,71 +1,70 @@
-# Good-search on the target host
+# Good-search MCP setup
 
-Pricewatch expects **Good-search MCP to already be running on the same machine** as Pricewatch (your Linux mini-PC). Pricewatch connects over localhost — no cloud tunnel or external search API is required.
+Pricewatch uses your **Good-search MCP server** on the mini-PC. After install, the server is exposed via **Tailscale Funnel** with a secret URL.
 
-## Assumed setup
-
-On the target host, Good-search is installed and running:
+## Install (on the mini-PC)
 
 ```bash
-cd ~/Good-search-git
+cd ~
+git clone git@github.com:katjabunich/Good-search.git Good-search-git
+cd Good-search-git
 git checkout claude/stealth-browser-parsing-alternatives-28lrsa
 bash mcp/install.sh --yes --no-tunnel
 ```
 
-Keep that MCP process running. Pricewatch will connect to it automatically on startup.
+The install script prints a URL like:
 
-## Pricewatch config
-
-In `.env`, set the MCP URL if you know it:
-
-```env
-PRICEWATCH_GOOD_SEARCH_MCP_URL=http://127.0.0.1:8765/mcp
+```text
+https://your-host.tailXXXX.ts.net/mcp/<secret-token>
 ```
 
-If the URL is unknown or the port differs, leave auto-discovery enabled (default):
+**Treat that URL as a password** — anyone with it can drive the browser on your machine.
+
+## Configure Pricewatch
+
+Put the full MCP URL in `.env` (never commit this file):
 
 ```env
-PRICEWATCH_GOOD_SEARCH_AUTO_DISCOVER=true
+PRICEWATCH_GOOD_SEARCH_MCP_URL=https://your-host.tailXXXX.ts.net/mcp/your-secret-token
+PRICEWATCH_GOOD_SEARCH_AUTO_DISCOVER=false
 ```
 
-Pricewatch probes common localhost MCP endpoints on startup and caches the first working one.
+Pricewatch uses the Good-search `scrape` tool to:
 
-Optional overrides if auto-discovery picks the wrong tools:
+- Search via DuckDuckGo HTML results (`PRICEWATCH_GOOD_SEARCH_SEARCH_URL_TEMPLATE`)
+- Fetch product pages with `maxAgeSec=0` for fresh prices
 
-```env
-PRICEWATCH_GOOD_SEARCH_SEARCH_TOOL=search
-PRICEWATCH_GOOD_SEARCH_FETCH_TOOL=fetch
-```
-
-## Verify on the target
+## Verify
 
 ```bash
 pricewatch
 curl http://localhost:8080/health
 ```
 
-A healthy response includes:
+Expected:
 
 ```json
 {
   "good_search": {
     "reachable": true,
-    "mcp_url": "http://127.0.0.1:8765/mcp",
-    "search_tool": "...",
-    "fetch_tool": "...",
-    "tools": ["..."]
+    "mcp_url": "https://your-host.tailXXXX.ts.net/mcp/<secret>",
+    "scrape_tool": "scrape",
+    "tools": ["scrape", "browse_open", "browse_act", "browse_close", "server_update"]
   }
 }
 ```
 
-The dashboard also shows Good-search status in the header.
+The API redacts the secret path segment in responses.
 
-## Co-located services
+## Architecture
 
 ```text
-Good-search MCP   →  already running on localhost
-Ollama            →  localhost:11434
-Pricewatch        →  localhost:8080
+Pricewatch (mini-PC or LAN)
+      │
+      ▼
+Good-search MCP (Tailscale Funnel URL)
+      │
+      └── stealth Chromium on mini-PC
 ```
 
-Pricewatch does not start or manage Good-search — it only connects to the existing MCP server.
+Pricewatch can run on the same mini-PC or another machine on your tailnet, as long as it can reach the Funnel URL.
