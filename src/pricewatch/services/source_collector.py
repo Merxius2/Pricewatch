@@ -35,7 +35,7 @@ class SourceCollector:
         max_other_results: int = 4,
     ) -> tuple[list[SourceListing], str | None]:
         listings: list[SourceListing] = []
-        seen_urls: set[str] = []
+        seen_urls: set[str] = set()
         reference_context: str | None = None
 
         async def add_listing(

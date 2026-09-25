@@ -63,7 +63,7 @@ class OllamaClient:
         search_query: str,
         context: str,
         source_url: str | None = None,
-        currency_hint: str = "USD",
+        currency_hint: str = "EUR",
     ) -> dict:
         source_line = f"Page URL: {source_url}\n" if source_url else ""
         user_message = (

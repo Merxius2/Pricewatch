@@ -25,7 +25,7 @@ class TrackedItemBase(BaseModel):
     target_price: float | None = Field(default=None, ge=0)
     alert_type: AlertTypeLiteral = "threshold"
     percent_drop: float | None = Field(default=None, ge=0, le=100)
-    currency: str = Field(default="USD", min_length=3, max_length=8)
+    currency: str = Field(default="EUR", min_length=3, max_length=8)
     notes: str | None = None
     tags: str | None = None
     enabled: bool = True

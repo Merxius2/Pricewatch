@@ -27,7 +27,7 @@ const els = {
   ollamaStatus: document.getElementById("ollama-status"),
 };
 
-function formatMoney(value, currency = "USD") {
+function formatMoney(value, currency = "EUR") {
   if (value == null) return "—";
   return new Intl.NumberFormat(undefined, {
     style: "currency",
@@ -212,7 +212,7 @@ function openDialog(item = null) {
   els.itemForm.reset();
   els.itemForm.enabled.checked = true;
   els.itemForm.also_search_other_sites.checked = true;
-  els.itemForm.currency.value = "USD";
+  els.itemForm.currency.value = "EUR";
 
   if (item) {
     for (const field of ["name", "preferred_site", "search_query", "product_url", "target_price", "percent_drop", "currency", "tags", "notes", "check_interval_minutes"]) {
@@ -291,7 +291,7 @@ async function checkItem(id) {
     const reviews = result.pending_reviews ? ` · ${result.pending_reviews} match review(s)` : "";
     showToast(
       result.success
-        ? `Checked: ${formatMoney(result.price, result.currency || "USD")}${site}${result.alert_triggered ? " — alert!" : ""}${reviews}`
+        ? `Checked: ${formatMoney(result.price, result.currency || "EUR")}${site}${result.alert_triggered ? " — alert!" : ""}${reviews}`
         : `${result.message || "Check failed"}${reviews}`,
       result.success ? "success" : "error",
     );
