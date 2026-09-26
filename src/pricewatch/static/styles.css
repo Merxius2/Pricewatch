@@ -326,6 +326,78 @@ h1, h2, h3, p {
   gap: 10px;
 }
 
+.price-chart-wrap {
+  margin: 12px 0 8px;
+  padding: 10px 12px 8px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.price-chart-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.price-chart-title {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.price-chart-range {
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+
+.price-chart {
+  display: block;
+  width: 100%;
+  height: 88px;
+}
+
+.price-chart-line {
+  fill: none;
+  stroke-width: 2.5;
+  vector-effect: non-scaling-stroke;
+}
+
+.price-chart-line.down {
+  stroke: var(--success);
+}
+
+.price-chart-line.up {
+  stroke: var(--danger);
+}
+
+.price-chart-area {
+  opacity: 0.22;
+}
+
+.price-chart-area.down {
+  fill: var(--success);
+}
+
+.price-chart-area.up {
+  fill: var(--danger);
+}
+
+.price-chart.empty {
+  margin: 12px 0 8px;
+  padding: 18px 14px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px dashed rgba(255, 255, 255, 0.1);
+  color: var(--muted);
+  font-size: 0.88rem;
+  text-align: center;
+}
+
 .current-price {
   font-size: 1.7rem;
   font-weight: 800;

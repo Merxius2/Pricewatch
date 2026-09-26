@@ -97,6 +97,7 @@ class TrackedItemOut(TrackedItemBase):
     alert_triggered: bool
     alert_triggered_at: datetime | None
     pending_match_reviews: int = 0
+    price_history: list[PriceHistoryOut] = []
     created_at: datetime
     updated_at: datetime
 
@@ -104,7 +105,6 @@ class TrackedItemOut(TrackedItemBase):
 
 
 class TrackedItemDetailOut(TrackedItemOut):
-    price_history: list[PriceHistoryOut] = []
     pending_reviews: list[ProductMatchReviewOut] = []
 
 

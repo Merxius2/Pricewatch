@@ -4,12 +4,15 @@ from sqlalchemy.orm import Session, joinedload
 from pricewatch.api.schemas import (
     CheckResultOut,
     DashboardStatsOut,
+    PriceHistoryOut,
     ProductMatchReviewOut,
     TrackedItemCreate,
     TrackedItemDetailOut,
     TrackedItemOut,
     TrackedItemUpdate,
 )
+
+HISTORY_CHART_LIMIT = 50
 from pricewatch.db.database import get_db
 from pricewatch.db.models import MatchReviewStatus, ProductMatchReview, TrackedItem
 from pricewatch.scheduler import get_last_run_at
@@ -26,6 +29,15 @@ def _serialize_item(item: TrackedItem) -> TrackedItemOut:
     )
     data = TrackedItemOut.model_validate(item)
     data.pending_match_reviews = pending
+    history = getattr(item, "price_history", None) or []
+    successful = [
+        entry
+        for entry in history
+        if entry.price is not None and entry.status == "success"
+    ]
+    successful.sort(key=lambda entry: entry.checked_at)
+    trimmed = successful[-HISTORY_CHART_LIMIT:]
+    data.price_history = [PriceHistoryOut.model_validate(entry) for entry in trimmed]
     return data
 
 
@@ -56,7 +68,10 @@ def get_stats(db: Session = Depends(get_db)) -> DashboardStatsOut:
 def list_items(db: Session = Depends(get_db)) -> list[TrackedItemOut]:
     items = (
         db.query(TrackedItem)
-        .options(joinedload(TrackedItem.match_reviews))
+        .options(
+            joinedload(TrackedItem.match_reviews),
+            joinedload(TrackedItem.price_history),
+        )
         .order_by(TrackedItem.created_at.desc())
         .all()
     )

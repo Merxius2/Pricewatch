@@ -170,6 +170,59 @@ function itemTitleHtml(item) {
   return `<a class="item-title-link" href="${safeUrl}" target="_blank" rel="noreferrer noopener">${name}</a>`;
 }
 
+function priceHistoryChartHtml(item) {
+  const points = (item.price_history || [])
+    .filter((entry) => entry.price != null)
+    .sort((a, b) => new Date(a.checked_at) - new Date(b.checked_at));
+
+  if (points.length === 0) {
+    return '<div class="price-chart empty">No price history yet — run a check to start the chart.</div>';
+  }
+
+  if (points.length === 1) {
+    return `<div class="price-chart empty">One data point (${formatMoney(points[0].price, item.currency)}) — check again for a trend.</div>`;
+  }
+
+  const prices = points.map((entry) => entry.price);
+  const min = Math.min(...prices);
+  const max = Math.max(...prices);
+  const range = max - min || 1;
+  const width = 320;
+  const height = 88;
+  const padX = 6;
+  const padY = 8;
+
+  const coords = prices.map((price, index) => {
+    const x = padX + (index / (prices.length - 1)) * (width - padX * 2);
+    const y = padY + (1 - (price - min) / range) * (height - padY * 2);
+    return { x, y, price };
+  });
+
+  const polyline = coords.map((point) => `${point.x},${point.y}`).join(" ");
+  const area = [
+    `${coords[0].x},${height - padY}`,
+    ...coords.map((point) => `${point.x},${point.y}`),
+    `${coords[coords.length - 1].x},${height - padY}`,
+  ].join(" ");
+
+  const last = prices[prices.length - 1];
+  const first = prices[0];
+  const trend = last <= first ? "down" : "up";
+
+  return `
+    <div class="price-chart-wrap">
+      <div class="price-chart-header">
+        <span class="price-chart-title">Price history</span>
+        <span class="price-chart-range">${formatMoney(min, item.currency)} – ${formatMoney(max, item.currency)}</span>
+      </div>
+      <svg class="price-chart" viewBox="0 0 ${width} ${height}" preserveAspectRatio="none" role="img" aria-label="Price history chart">
+        <polygon class="price-chart-area ${trend}" points="${area}"></polygon>
+        <polyline class="price-chart-line ${trend}" points="${polyline}"></polyline>
+      </svg>
+    </div>
+  `;
+}
+
 function priceDelta(item) {
   if (item.current_price == null || item.previous_price == null) return null;
   const diff = item.current_price - item.previous_price;
@@ -219,15 +272,9 @@ function renderItems() {
         <span class="current-price">${formatMoney(item.current_price, item.currency)}</span>
         ${delta ? `<span class="price-delta ${delta.className}">${delta.text}</span>` : ""}
       </div>
-      <div class="badges">
-        <span class="badge">${alertLabel(item)}</span>
-        ${item.preferred_site ? `<span class="badge">Preferred ${escapeHtml(item.preferred_site)}</span>` : ""}
-        ${item.current_source_site ? `<span class="badge">Best on ${escapeHtml(item.current_source_site)}</span>` : ""}
-        ${item.lowest_price != null ? `<span class="badge">Low ${formatMoney(item.lowest_price, item.currency)}</span>` : ""}
-        ${item.pending_match_reviews ? `<span class="badge warning">${item.pending_match_reviews} review(s)</span>` : ""}
-        ${item.tags ? `<span class="badge">${escapeHtml(item.tags)}</span>` : ""}
-      </div>
-      <div class="item-meta">Last checked: ${formatDate(item.last_checked_at)}</div>
+      ${priceHistoryChartHtml(item)}
+      ${item.pending_match_reviews ? `<div class="badges"><span class="badge warning">${item.pending_match_reviews} review(s)</span></div>` : ""}
+      <div class="item-meta">Last checked: ${formatDate(item.last_checked_at)} · ${alertLabel(item)}</div>
       ${item.last_check_error ? `<div class="item-meta" style="color: var(--danger)">${escapeHtml(item.last_check_error)}</div>` : ""}
       <div class="card-actions">
         <button class="btn btn-secondary" data-action="check" data-id="${item.id}">Check now</button>
