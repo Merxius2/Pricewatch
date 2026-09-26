@@ -210,6 +210,12 @@ main() {
   ensure_run_user
   sync_repo
 
+  # install.sh may have been updated by sync_repo; re-run the latest script once.
+  if [[ "${PRICEWATCH_INSTALL_REEXECED:-0}" != "1" ]]; then
+    export PRICEWATCH_INSTALL_REEXECED=1
+    exec bash "$INSTALL_DIR/deploy/install.sh" "$@"
+  fi
+
   local mcp_url
   mcp_url="$(detect_good_search_mcp_url || true)"
   if [[ -z "$mcp_url" ]]; then
