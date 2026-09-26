@@ -1,0 +1,8 @@
+[Unit]
+Description=Pull and deploy Pricewatch updates from GitHub main
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/opt/pricewatch/deploy/update.sh

@@ -41,11 +41,27 @@ Open the dashboard at `http://<mini-pc-ip>:8080/` from any device on your Tailne
 ## Update
 
 ```bash
+sudo bash /opt/pricewatch/deploy/update.sh
+```
+
+Full reinstall (venv, systemd, timer):
+
+```bash
 sudo bash /opt/pricewatch/deploy/install.sh
 ```
 
-Or:
+## Auto-update from `main`
+
+`deploy/install.sh` enables **`pricewatch-update.timer`**, which runs every **10 minutes** (and once shortly after boot). When `origin/main` has new commits, the mini-PC pulls, reinstalls the Python package, and restarts the service.
 
 ```bash
-cd /opt/pricewatch && sudo git pull && sudo .venv/bin/pip install -e . && sudo systemctl restart pricewatch
+systemctl status pricewatch-update.timer
+journalctl -u pricewatch-update.service -n 20
+sudo systemctl start pricewatch-update.service   # run a check now
+```
+
+Disable auto-update:
+
+```bash
+sudo systemctl disable --now pricewatch-update.timer
 ```

@@ -15,6 +15,7 @@ set -euo pipefail
 #   BRANCH=main
 #   RUN_USER=$USER          # run as current user instead of creating 'pricewatch'
 #   SKIP_SYSTEMD=1          # only install files, do not enable systemd service
+#   SKIP_AUTO_UPDATE=1      # do not enable the git pull + deploy timer
 
 INSTALL_DIR="${INSTALL_DIR:-/opt/pricewatch}"
 REPO_URL="${REPO_URL:-https://github.com/Merxius2/Pricewatch.git}"
@@ -167,6 +168,20 @@ install_systemd_service() {
   systemctl restart "$SERVICE_NAME"
 }
 
+install_auto_update_timer() {
+  if [[ "${SKIP_SYSTEMD:-0}" == "1" || "${SKIP_AUTO_UPDATE:-0}" == "1" ]]; then
+    warn "Skipping auto-update timer (SKIP_SYSTEMD or SKIP_AUTO_UPDATE)"
+    return
+  fi
+
+  log "Installing auto-update timer (checks main every 10 minutes)"
+  chmod +x "$INSTALL_DIR/deploy/update.sh"
+  cp "$INSTALL_DIR/deploy/pricewatch-update.service" /etc/systemd/system/
+  cp "$INSTALL_DIR/deploy/pricewatch-update.timer" /etc/systemd/system/
+  systemctl daemon-reload
+  systemctl enable --now pricewatch-update.timer
+}
+
 print_summary() {
   local ip
   ip="$(hostname -I 2>/dev/null | awk '{print $1}')"
@@ -179,9 +194,12 @@ Pricewatch installed.
   Service:    systemctl status $SERVICE_NAME
   Logs:       journalctl -u $SERVICE_NAME -f
   Config:     $INSTALL_DIR/.env
+  Auto-update: systemctl status pricewatch-update.timer
 
 If Good-search is not connected, edit .env and set PRICEWATCH_GOOD_SEARCH_MCP_URL,
 then run: sudo systemctl restart $SERVICE_NAME
+
+Manual update: sudo bash $INSTALL_DIR/deploy/update.sh
 
 EOF
 }
@@ -204,6 +222,7 @@ main() {
   install_python_env
   chown -R "$RUN_USER:$RUN_USER" "$INSTALL_DIR"
   install_systemd_service
+  install_auto_update_timer
   print_summary
 }
 
