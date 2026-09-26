@@ -28,3 +28,14 @@ def test_thousands_with_dot_and_comma_cents() -> None:
     result = extract_price_heuristic(html, currency_hint="EUR")
     assert result is not None
     assert result["price"] == 1299.0
+
+
+def test_phonemarket_html_entity_and_comma_dash() -> None:
+    html = """
+    2e Kans Apple iPhone 17e 256GB White
+    &euro; 22,95 accessory
+    &euro; 719,- 3 op voorraad Toevoegen aan winkelwagen
+    """
+    result = extract_price_heuristic(html, currency_hint="EUR")
+    assert result is not None
+    assert result["price"] == 719.0

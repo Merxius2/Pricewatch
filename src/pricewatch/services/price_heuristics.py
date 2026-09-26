@@ -38,6 +38,8 @@ def extract_price_heuristic(
     if not content or not content.strip():
         return None
 
+    content = unescape(content)
+
     for match in _JSON_LD_RE.finditer(content):
         raw = unescape(match.group(1)).strip()
         try:
@@ -66,6 +68,15 @@ def extract_price_heuristic(
                     "Product meta tag on the page",
                 )
 
+    dutch_price = _best_dutch_euro_price(content)
+    if dutch_price is not None:
+        return _result(
+            dutch_price,
+            currency_hint,
+            "medium",
+            "Euro price on the product page (Dutch format)",
+        )
+
     euro_match = _EURO_RE.search(content)
     if euro_match:
         raw = euro_match.group(1) or euro_match.group(2)
@@ -79,6 +90,42 @@ def extract_price_heuristic(
             )
 
     return None
+
+
+_DUTCH_EURO_PRICE_RE = re.compile(
+    r"€\s*(\d{1,3}(?:\.\d{3})*|\d+)\s*(?:,\s*-|,\d{2})",
+    re.IGNORECASE,
+)
+
+
+def _best_dutch_euro_price(content: str) -> float | None:
+    """Pick the main product price when a page lists accessories too (e.g. PhoneMarket)."""
+    best: float | None = None
+    best_score = -1.0
+
+    for match in _DUTCH_EURO_PRICE_RE.finditer(content):
+        prefix = content[max(0, match.start() - 24) : match.start()].lower()
+        if "adviesprijs" in prefix:
+            continue
+
+        amount = _parse_amount(match.group(1))
+        if amount is None or amount < 20:
+            continue
+
+        window = content[match.start() : match.end() + 48].lower()
+        score = amount
+        if "op voorraad" in window:
+            score += 10_000
+        if "toevoegen aan winkelwagen" in window:
+            score += 5_000
+        if "winkelwagen" in window:
+            score += 1_000
+
+        if score > best_score:
+            best_score = score
+            best = amount
+
+    return best
 
 
 def _result(price: float, currency: str, confidence: str, summary: str) -> dict[str, Any]:
