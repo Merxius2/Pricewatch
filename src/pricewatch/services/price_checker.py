@@ -19,6 +19,7 @@ from pricewatch.db.models import (
 )
 from pricewatch.services.good_search import GoodSearchError
 from pricewatch.services.ollama import OllamaClient, OllamaError
+from pricewatch.services.price_heuristics import extract_price_heuristic
 from pricewatch.services.source_collector import SourceCollector, SourceListing
 from pricewatch.utils.urls import site_from_url
 
@@ -76,13 +77,17 @@ class PriceChecker:
     async def check_item(self, db: Session, item: TrackedItem) -> PriceCheckResult:
         try:
             confirmed_urls = [alt.url for alt in item.confirmed_alternates]
+            mode = self.settings.price_extraction
+            use_ollama = mode in {"ollama", "heuristic_first"}
+            direct_url_only = bool(item.product_url) and mode in {"heuristic", "heuristic_first"}
             listings, reference_context = await self.collector.collect(
                 name=item.name,
                 search_query=item.search_query,
                 preferred_site=item.preferred_site,
                 product_url=item.product_url,
-                also_search_other_sites=item.also_search_other_sites,
+                also_search_other_sites=item.also_search_other_sites if use_ollama else False,
                 confirmed_urls=confirmed_urls,
+                direct_url_only=direct_url_only,
             )
             if not listings:
                 return self._record_failure(db, item, "No pages could be loaded for this product.")
@@ -113,6 +118,12 @@ class PriceChecker:
 
             if not verified_prices:
                 pending_count = self._count_pending_reviews(db, item.id)
+                if mode == "heuristic":
+                    message = (
+                        "Could not parse a price from the product page. "
+                        "Check the product URL or try PRICEWATCH_PRICE_EXTRACTION=heuristic_first."
+                    )
+                    return self._record_failure(db, item, message)
                 message = (
                     "No verified prices found."
                     if pending_count == 0
@@ -154,6 +165,29 @@ class PriceChecker:
             detail = str(exc).strip() or type(exc).__name__
             return self._record_failure(db, item, f"Unexpected error: {detail}")
 
+    async def _extract_price(self, item: TrackedItem, listing: SourceListing) -> dict | None:
+        mode = self.settings.price_extraction
+        heuristic = extract_price_heuristic(listing.content, currency_hint=item.currency)
+
+        if mode == "heuristic":
+            return heuristic
+
+        if mode == "heuristic_first" and heuristic is not None:
+            confidence = heuristic.get("confidence", "none")
+            if confidence in {"high", "medium"}:
+                return heuristic
+
+        if mode in {"ollama", "heuristic_first"}:
+            return await self.ollama.extract_price(
+                product_name=item.name,
+                search_query=item.search_query,
+                context=listing.content,
+                source_url=listing.url,
+                currency_hint=item.currency,
+            )
+
+        return heuristic
+
     async def _evaluate_listing(
         self,
         item: TrackedItem,
@@ -161,13 +195,12 @@ class PriceChecker:
         reference_context: str | None,
         db: Session,
     ) -> VerifiedPrice | None:
-        extraction = await self.ollama.extract_price(
-            product_name=item.name,
-            search_query=item.search_query,
-            context=listing.content,
-            source_url=listing.url,
-            currency_hint=item.currency,
-        )
+        if self.settings.price_extraction == "heuristic" and listing.source_type == "other":
+            return None
+
+        extraction = await self._extract_price(item, listing)
+        if not extraction:
+            return None
         price = extraction.get("price")
         currency = extraction.get("currency") or item.currency
         confidence = extraction.get("confidence", "none")
@@ -186,6 +219,9 @@ class PriceChecker:
                 summary=summary,
                 listing=listing,
             )
+
+        if self.settings.price_extraction == "heuristic":
+            return None
 
         match = await self.ollama.compare_product_match(
             tracked_name=item.name,

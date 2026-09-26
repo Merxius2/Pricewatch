@@ -1,6 +1,9 @@
 from functools import lru_cache
+from typing import Literal
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+PriceExtractionMode = Literal["heuristic", "ollama", "heuristic_first"]
 
 
 class Settings(BaseSettings):
@@ -16,6 +19,8 @@ class Settings(BaseSettings):
 
     ollama_base_url: str = "http://localhost:11434"
     ollama_model: str = "llama3.2"
+    # heuristic = fast HTML/JSON parse only; ollama = LLM only; heuristic_first = try parse then LLM
+    price_extraction: PriceExtractionMode = "heuristic"
 
     # Full Good-search MCP URL including the secret path segment (Tailscale Funnel).
     # Example: https://your-host.tailXXXX.ts.net/mcp/<secret>

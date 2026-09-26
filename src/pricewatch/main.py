@@ -88,6 +88,7 @@ async def health() -> dict:
         "status": "ok",
         "ollama": settings.ollama_base_url,
         "model": settings.ollama_model,
+        "price_extraction": settings.price_extraction,
         "good_search_mcp_url": settings.good_search_mcp_url,
         "check_interval_minutes": settings.check_interval_minutes,
     }

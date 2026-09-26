@@ -33,6 +33,7 @@ class SourceCollector:
         also_search_other_sites: bool,
         confirmed_urls: list[str],
         max_other_results: int = 4,
+        direct_url_only: bool = False,
     ) -> tuple[list[SourceListing], str | None]:
         listings: list[SourceListing] = []
         seen_urls: set[str] = set()
@@ -67,9 +68,18 @@ class SourceCollector:
                 reference_context = self._reference_text(listing)
 
         preferred = normalize_site(preferred_site)
+        if direct_url_only:
+            also_search_other_sites = False
 
         if product_url:
             await add_listing(product_url, source_type="preferred", title=name)
+
+        if direct_url_only:
+            for url in confirmed_urls:
+                await add_listing(url, source_type="confirmed", title=name)
+            if reference_context is None and listings:
+                reference_context = self._reference_text(listings[0])
+            return listings, reference_context
 
         if preferred and not (product_url and urls_share_site(product_url, preferred)):
             site_results = await self.good_search.search(

@@ -89,9 +89,15 @@ function renderServiceStatus(health) {
     els.goodSearchStatus.title = goodSearch.error || "Not reachable";
   }
 
-  els.ollamaStatus.textContent = `Ollama: ${health.model || "configured"}`;
+  const extraction = health.price_extraction || "heuristic";
+  if (extraction === "heuristic") {
+    els.ollamaStatus.textContent = "Prices: fast parse";
+    els.ollamaStatus.title = "Heuristic extraction (no Ollama required)";
+  } else {
+    els.ollamaStatus.textContent = `Ollama: ${health.model || "configured"}`;
+    els.ollamaStatus.title = `${health.ollama || ""}\nMode: ${extraction}`;
+  }
   els.ollamaStatus.className = "status-pill ok";
-  els.ollamaStatus.title = health.ollama || "";
 }
 
 function renderStats(stats) {
