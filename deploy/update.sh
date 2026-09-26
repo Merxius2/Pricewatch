@@ -20,6 +20,9 @@ if [[ ! -d "$INSTALL_DIR/.git" ]]; then
   exit 1
 fi
 
+# Repo is often owned by the app user while this script runs as root.
+git config --global --add safe.directory "$INSTALL_DIR" 2>/dev/null || true
+
 git -C "$INSTALL_DIR" fetch origin "$BRANCH"
 local_rev="$(git -C "$INSTALL_DIR" rev-parse HEAD)"
 remote_rev="$(git -C "$INSTALL_DIR" rev-parse "origin/$BRANCH")"

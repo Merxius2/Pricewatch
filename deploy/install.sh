@@ -138,6 +138,7 @@ ensure_run_user() {
 
 sync_repo() {
   log "Syncing Pricewatch to $INSTALL_DIR"
+  git config --global --add safe.directory "$INSTALL_DIR" 2>/dev/null || true
   if [[ -d "$INSTALL_DIR/.git" ]]; then
     git -C "$INSTALL_DIR" fetch origin "$BRANCH"
     git -C "$INSTALL_DIR" checkout "$BRANCH"
