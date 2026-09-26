@@ -42,9 +42,10 @@ function formatDate(value) {
 }
 
 function showToast(message, type = "success") {
+  if (!els.toast) return;
   els.toast.textContent = message;
   els.toast.className = `toast ${type}`;
-  setTimeout(() => els.toast.classList.add("hidden"), 3500);
+  setTimeout(() => els.toast?.classList.add("hidden"), 3500);
 }
 
 async function api(path, options = {}) {
@@ -77,6 +78,7 @@ async function loadDashboard() {
 }
 
 function renderServiceStatus(health) {
+  if (!els.serviceStatus || !els.goodSearchStatus) return;
   els.serviceStatus.classList.remove("hidden");
 
   const goodSearch = health.good_search || {};
@@ -89,18 +91,18 @@ function renderServiceStatus(health) {
     els.goodSearchStatus.className = "status-pill warn";
     els.goodSearchStatus.title = goodSearch.error || "Not reachable";
   }
-
 }
 
 function renderStats(stats) {
-  els.statsTotal.textContent = stats.total_items;
-  els.statsEnabled.textContent = stats.enabled_items;
-  els.statsAlerts.textContent = stats.alerts_active;
-  els.statsReviews.textContent = stats.pending_match_reviews;
-  els.statsLastRun.textContent = formatDate(stats.last_run_at);
+  if (els.statsTotal) els.statsTotal.textContent = stats.total_items;
+  if (els.statsEnabled) els.statsEnabled.textContent = stats.enabled_items;
+  if (els.statsAlerts) els.statsAlerts.textContent = stats.alerts_active;
+  if (els.statsReviews) els.statsReviews.textContent = stats.pending_match_reviews;
+  if (els.statsLastRun) els.statsLastRun.textContent = formatDate(stats.last_run_at);
 }
 
 function renderReviews() {
+  if (!els.reviewsContainer || !els.reviewsPanel) return;
   els.reviewsContainer.innerHTML = "";
   els.reviewsPanel.classList.toggle("hidden", state.reviews.length === 0);
 
@@ -188,9 +190,10 @@ function matchesFilter(item) {
 }
 
 function renderItems() {
+  if (!els.itemsContainer) return;
   const filtered = state.items.filter(matchesFilter);
   els.itemsContainer.innerHTML = "";
-  els.emptyState.classList.toggle("hidden", filtered.length > 0);
+  if (els.emptyState) els.emptyState.classList.toggle("hidden", filtered.length > 0);
 
   filtered.forEach((item) => {
     const delta = priceDelta(item);

@@ -70,12 +70,29 @@ templates = Jinja2Templates(directory=templates_dir)
 app.include_router(api_router)
 
 
+def _static_asset_version() -> str:
+    try:
+        import subprocess
+
+        root = Path(__file__).resolve().parent.parent.parent
+        return subprocess.check_output(
+            ["git", "rev-parse", "--short", "HEAD"],
+            cwd=root,
+            text=True,
+            stderr=subprocess.DEVNULL,
+        ).strip()
+    except OSError:
+        from pricewatch import __version__
+
+        return __version__
+
+
 @app.get("/", response_class=HTMLResponse)
 async def dashboard(request: Request) -> HTMLResponse:
     return templates.TemplateResponse(
         request,
         "dashboard.html",
-        context={"request": request},
+        context={"request": request, "asset_version": _static_asset_version()},
     )
 
 
