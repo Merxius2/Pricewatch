@@ -336,6 +336,19 @@ h1, h2, h3, p {
   background: rgba(255, 176, 32, 0.12);
 }
 
+.badge.autocheck.on {
+  color: var(--accent, #6eb6ff);
+  background: rgba(110, 182, 255, 0.14);
+  font-weight: 600;
+}
+
+.badge.autocheck.off {
+  color: var(--muted);
+  background: rgba(255, 255, 255, 0.04);
+  text-decoration: line-through;
+  text-decoration-color: rgba(255, 255, 255, 0.25);
+}
+
 .card-actions {
   display: flex;
   flex-wrap: wrap;

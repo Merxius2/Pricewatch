@@ -3,6 +3,7 @@ const state = {
   reviews: [],
   editingId: null,
   filter: "",
+  defaultCheckIntervalMinutes: 60,
 };
 
 const els = {
@@ -69,6 +70,7 @@ async function loadDashboard() {
   ]);
   state.items = items;
   state.reviews = reviews;
+  state.defaultCheckIntervalMinutes = health.check_interval_minutes ?? 60;
   renderStats(stats);
   renderServiceStatus(health);
   renderReviews();
@@ -139,6 +141,23 @@ function alertLabel(item) {
   return `Target ${formatMoney(item.target_price, item.currency)}`;
 }
 
+function autoCheckIntervalMinutes(item) {
+  return item.check_interval_minutes ?? state.defaultCheckIntervalMinutes;
+}
+
+function autoCheckBadge(item) {
+  if (!item.enabled) {
+    return {
+      html: '<span class="badge autocheck off" title="Automatic scheduled checks are paused">Auto-check off</span>',
+    };
+  }
+  const mins = autoCheckIntervalMinutes(item);
+  const custom = item.check_interval_minutes != null ? " (custom)" : "";
+  return {
+    html: `<span class="badge autocheck on" title="Price is checked automatically every ${mins} minutes${custom}">⟳ Auto-check every ${mins}m</span>`,
+  };
+}
+
 function priceDelta(item) {
   if (item.current_price == null || item.previous_price == null) return null;
   const diff = item.current_price - item.previous_price;
@@ -175,8 +194,8 @@ function renderItems() {
         </div>
         <div class="badges">
           ${item.alert_triggered ? '<span class="badge warning">Alert</span>' : ""}
+          ${autoCheckBadge(item).html}
           <span class="badge ${item.last_check_status}">${item.last_check_status}</span>
-          ${item.enabled ? '<span class="badge success">Enabled</span>' : '<span class="badge">Paused</span>'}
         </div>
       </div>
       <div class="price-row">
