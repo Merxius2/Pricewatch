@@ -268,9 +268,51 @@ h1, h2, h3, p {
   gap: 12px;
 }
 
+.item-title-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.autocheck-dot {
+  flex-shrink: 0;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+
+.autocheck-dot.on {
+  background: var(--success);
+  box-shadow: 0 0 0 3px rgba(62, 207, 142, 0.22);
+}
+
+.autocheck-dot.off {
+  background: var(--danger);
+  box-shadow: 0 0 0 3px rgba(255, 107, 107, 0.18);
+}
+
 .item-title {
   font-size: 1.08rem;
   font-weight: 700;
+}
+
+.item-title-link {
+  color: inherit;
+  text-decoration: none;
+}
+
+.item-title-link:hover {
+  color: var(--accent, #6eb6ff);
+  text-decoration: underline;
+}
+
+.item-link a {
+  color: var(--accent, #6eb6ff);
+  text-decoration: none;
+}
+
+.item-link a:hover {
+  text-decoration: underline;
 }
 
 .item-meta {

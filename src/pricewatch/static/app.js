@@ -25,7 +25,6 @@ const els = {
   toast: document.getElementById("toast"),
   serviceStatus: document.getElementById("service-status"),
   goodSearchStatus: document.getElementById("good-search-status"),
-  ollamaStatus: document.getElementById("ollama-status"),
 };
 
 function formatMoney(value, currency = "EUR") {
@@ -91,15 +90,6 @@ function renderServiceStatus(health) {
     els.goodSearchStatus.title = goodSearch.error || "Not reachable";
   }
 
-  const extraction = health.price_extraction || "heuristic";
-  if (extraction === "heuristic") {
-    els.ollamaStatus.textContent = "Prices: fast parse";
-    els.ollamaStatus.title = "Heuristic extraction (no Ollama required)";
-  } else {
-    els.ollamaStatus.textContent = `Ollama: ${health.model || "configured"}`;
-    els.ollamaStatus.title = `${health.ollama || ""}\nMode: ${extraction}`;
-  }
-  els.ollamaStatus.className = "status-pill ok";
 }
 
 function renderStats(stats) {
@@ -145,6 +135,14 @@ function autoCheckIntervalMinutes(item) {
   return item.check_interval_minutes ?? state.defaultCheckIntervalMinutes;
 }
 
+function autoCheckDot(item) {
+  if (!item.enabled) {
+    return '<span class="autocheck-dot off" title="Auto-check off"></span>';
+  }
+  const mins = autoCheckIntervalMinutes(item);
+  return `<span class="autocheck-dot on" title="Auto-check every ${mins} minutes"></span>`;
+}
+
 function autoCheckBadge(item) {
   if (!item.enabled) {
     return {
@@ -154,8 +152,20 @@ function autoCheckBadge(item) {
   const mins = autoCheckIntervalMinutes(item);
   const custom = item.check_interval_minutes != null ? " (custom)" : "";
   return {
-    html: `<span class="badge autocheck on" title="Price is checked automatically every ${mins} minutes${custom}">⟳ Auto-check every ${mins}m</span>`,
+    html: `<span class="badge autocheck on" title="Price is checked automatically every ${mins} minutes${custom}">⟳ every ${mins}m</span>`,
   };
+}
+
+function productPageUrl(item) {
+  return item.product_url || item.current_source_url || null;
+}
+
+function itemTitleHtml(item) {
+  const url = productPageUrl(item);
+  const name = escapeHtml(item.name);
+  if (!url) return name;
+  const safeUrl = escapeHtml(url);
+  return `<a class="item-title-link" href="${safeUrl}" target="_blank" rel="noreferrer noopener">${name}</a>`;
 }
 
 function priceDelta(item) {
@@ -189,8 +199,12 @@ function renderItems() {
     card.innerHTML = `
       <div class="item-top">
         <div>
-          <div class="item-title">${escapeHtml(item.name)}</div>
+          <div class="item-title-row">
+            ${autoCheckDot(item)}
+            <div class="item-title">${itemTitleHtml(item)}</div>
+          </div>
           <div class="item-meta">${escapeHtml(item.search_query)}</div>
+          ${productPageUrl(item) ? `<div class="item-meta item-link"><a href="${escapeHtml(productPageUrl(item))}" target="_blank" rel="noreferrer noopener">Open product page ↗</a></div>` : ""}
         </div>
         <div class="badges">
           ${item.alert_triggered ? '<span class="badge warning">Alert</span>' : ""}
