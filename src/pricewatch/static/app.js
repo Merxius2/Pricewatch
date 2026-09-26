@@ -284,7 +284,12 @@ async function deleteItem(id) {
   }
 }
 
-async function checkItem(id) {
+async function checkItem(id, button = null) {
+  const originalLabel = button?.textContent;
+  if (button) {
+    button.disabled = true;
+    button.textContent = "Checking…";
+  }
   try {
     const result = await api(`/api/items/${id}/check`, { method: "POST" });
     const site = result.source_site ? ` on ${result.source_site}` : "";
@@ -298,6 +303,11 @@ async function checkItem(id) {
     await loadDashboard();
   } catch (error) {
     showToast(error.message, "error");
+  } finally {
+    if (button) {
+      button.disabled = false;
+      button.textContent = originalLabel;
+    }
   }
 }
 
@@ -372,7 +382,7 @@ els.itemsContainer.addEventListener("click", (event) => {
   const action = button.dataset.action;
   if (action === "edit") openDialog(state.items.find((item) => item.id === id));
   if (action === "delete") deleteItem(id);
-  if (action === "check") checkItem(id);
+  if (action === "check") checkItem(id, button);
   if (action === "history") showHistory(id);
 });
 

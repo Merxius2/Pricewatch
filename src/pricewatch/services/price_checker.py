@@ -1,8 +1,11 @@
 from __future__ import annotations
 
+import logging
 from datetime import datetime, timezone
 
 from sqlalchemy.orm import Session
+
+logger = logging.getLogger(__name__)
 
 from pricewatch.config import Settings, get_settings
 from pricewatch.db.models import (
@@ -88,7 +91,21 @@ class PriceChecker:
             pending_reviews = 0
 
             for listing in listings:
-                verified = await self._evaluate_listing(item, listing, reference_context, db)
+                try:
+                    verified = await self._evaluate_listing(
+                        item, listing, reference_context, db
+                    )
+                except (GoodSearchError, OllamaError) as exc:
+                    logger.warning(
+                        "Skipping listing %s after service error: %s",
+                        listing.url,
+                        exc,
+                    )
+                    continue
+                except Exception:
+                    logger.exception("Skipping listing %s after unexpected error", listing.url)
+                    continue
+
                 if verified:
                     verified_prices.append(verified)
                 elif listing.source_type == "other":
@@ -134,7 +151,8 @@ class PriceChecker:
         except (GoodSearchError, OllamaError) as exc:
             return self._record_failure(db, item, str(exc))
         except Exception as exc:  # noqa: BLE001
-            return self._record_failure(db, item, f"Unexpected error: {exc}")
+            detail = str(exc).strip() or type(exc).__name__
+            return self._record_failure(db, item, f"Unexpected error: {detail}")
 
     async def _evaluate_listing(
         self,

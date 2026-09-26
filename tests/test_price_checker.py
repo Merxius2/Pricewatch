@@ -88,6 +88,56 @@ class TestRecordFailure:
 
 
 @pytest.mark.asyncio
+async def test_check_item_continues_when_secondary_listing_fails(db_session) -> None:
+    from pricewatch.services.ollama import OllamaError
+    from pricewatch.services.price_checker import VerifiedPrice
+    from pricewatch.services.source_collector import SourceListing
+
+    checker = PriceChecker()
+    item = _make_item()
+    db_session.add(item)
+    db_session.commit()
+
+    preferred = SourceListing(
+        url="https://www.phonemarket.nl/iphone",
+        site="phonemarket.nl",
+        title="iPhone",
+        content="price page",
+        source_type="preferred",
+    )
+    other = SourceListing(
+        url="https://www.example.com/iphone",
+        site="example.com",
+        title="iPhone",
+        content="other page",
+        source_type="other",
+    )
+
+    async def fake_collect(**kwargs):
+        return [preferred, other], "reference"
+
+    async def fake_evaluate(item, listing, reference_context, db):
+        if listing.source_type == "preferred":
+            return VerifiedPrice(
+                price=899.0,
+                currency="EUR",
+                source_url=listing.url,
+                source_site=listing.site,
+                summary="ok",
+                listing=listing,
+            )
+        raise OllamaError("Ollama request timed out (120s)")
+
+    with patch.object(checker.collector, "collect", side_effect=fake_collect):
+        with patch.object(checker, "_evaluate_listing", side_effect=fake_evaluate):
+            result = await checker.check_item(db_session, item)
+
+    assert result.success is True
+    assert result.price == 899.0
+    assert item.last_check_status == "success"
+
+
+@pytest.mark.asyncio
 async def test_check_item_handles_collector_errors_gracefully(db_session) -> None:
     checker = PriceChecker()
     item = _make_item()

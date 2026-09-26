@@ -109,8 +109,12 @@ class OllamaClient:
             "format": "json",
         }
 
-        async with httpx.AsyncClient(timeout=120.0) as client:
-            response = await client.post(f"{self.base_url}/api/chat", json=payload)
+        timeout = httpx.Timeout(120.0, connect=30.0)
+        async with httpx.AsyncClient(timeout=timeout) as client:
+            try:
+                response = await client.post(f"{self.base_url}/api/chat", json=payload)
+            except httpx.TimeoutException as exc:
+                raise OllamaError("Ollama request timed out (120s)") from exc
             if response.status_code >= 400:
                 raise OllamaError(f"Ollama request failed ({response.status_code}): {response.text}")
 
