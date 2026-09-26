@@ -28,15 +28,20 @@ class PriceWatchScheduler:
 
     def start(self) -> None:
         interval = max(self.settings.check_interval_minutes, 5)
+        # First run shortly after boot, then every `interval` minutes.
+        first_run = datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(seconds=30)
         self.scheduler.add_job(
             self.run_due_checks,
-            trigger=IntervalTrigger(minutes=interval),
+            trigger=IntervalTrigger(minutes=interval, start_date=first_run),
             id="price_checks",
             replace_existing=True,
             max_instances=1,
         )
         self.scheduler.start()
-        logger.info("Scheduler started; global interval=%s minutes", interval)
+        logger.info(
+            "Scheduler started; global interval=%s minutes (first run ~30s after boot)",
+            interval,
+        )
 
     def shutdown(self) -> None:
         self.scheduler.shutdown(wait=False)
